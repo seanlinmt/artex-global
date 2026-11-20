@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Autumn-27/artex/config"
 )
 
 // F3b(update.go): 셀프 업데이트 엔드포인트의 사용자 노출 문구가 한국어인지 지키는 회귀 테스트.
@@ -14,6 +16,44 @@ import (
 // 렌더하므로, 이 문구가 중국어로 되돌아가면 업데이트 화면에 중국어 토스트·진행 메시지가 다시 뜬다.
 // assertKoreanError·decodeErrorField 헬퍼는 선행 F3b 테스트 파일(같은 package server)에서 재사용한다.
 
+// TestUpdateMessagesTranslated pins that the update messages reaching the browser
+// (SSE progress.message, progress.error, writeErr bodies, and the update/check
+// "reason" field) are translated. They bypass writeErr's own trMsg call in some
+// paths, so a missing catalog entry used to leak Korean into an English UI — the
+// settings screen showed "Can't connect to GitHub: 저장소 ..." exactly this way.
+func TestUpdateMessagesTranslated(t *testing.T) {
+	t.Cleanup(func() { config.CurrentLanguage = nil })
+	config.CurrentLanguage = func() string { return "en" }
+	hasHangul := func(s string) bool {
+		for _, r := range s {
+			if r >= 0xAC00 && r <= 0xD7A3 {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, ko := range []string{
+		updateMsgPreparing,
+		updateMsgFailed,
+		updateMsgStaged,
+		updateErrInProgress,
+		updateErrRollbackInProgress,
+	} {
+		if got := trMsg(ko); got == ko || hasHangul(got) {
+			t.Errorf("update message not translated: %q -> %q", ko, got)
+		}
+	}
+	// Format-string constants are translated before the verbs are filled.
+	for _, ko := range []string{updateErrNotReleaseFmt, updateErrAlreadyLatestFmt} {
+		if got := fmt.Sprintf(trMsg(ko), "v1.2.3"); hasHangul(got) {
+			t.Errorf("formatted update message contains Hangul: %q", got)
+		}
+	}
+}
+
+// TestUpdateMessageConstantsLocalized keeps the original Korean-source guard: the
+// constants themselves stay Korean, so the Korean UI keeps its wording.
 func TestUpdateMessageConstantsLocalized(t *testing.T) {
 	assertKoreanError(t, "updateMsgPreparing", updateMsgPreparing)
 	assertKoreanError(t, "updateMsgFailed", updateMsgFailed)

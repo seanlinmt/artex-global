@@ -90,6 +90,19 @@ func TestCompareVersions(t *testing.T) {
 		{"0.3.7-dirty", "0.3.8", 0, false},
 		{"0.3", "0.3.8", 0, false},
 		{"", "0.3.8", 0, false},
+		// 이 포크의 실제 릴리스 태그 형식. 예전 파서는 이걸 전부 "비교 불가" 로
+		// 판정해서 원클릭 업데이트를 영구히 막았다(릴리스가 있어도).
+		{"0.3.15-global.1", "0.3.15-global.2", -1, true},
+		{"0.3.15-global.2", "0.3.15-global.1", 1, true},
+		{"v0.3.15-global.1", "0.3.15-global.1", 0, true},
+		// 접미부 없는 상류식 태그는 같은 숫자의 포크 첫 빌드보다 앞선다.
+		{"0.3.15", "0.3.15-global.1", -1, true},
+		{"0.3.15-global.1", "0.3.15", 1, true},
+		{"0.3.15-global.1", "0.3.16-global.1", -1, true},
+		// 빌드 번호는 사전순이 아니라 숫자로 비교한다.
+		{"0.3.15-global.9", "0.3.15-global.10", -1, true},
+		// git describe 산출물은 접미부가 하이픈으로 두 번 갈라지므로 여전히 비교 불가.
+		{"0.3.15-global.1-2-gabc1234", "0.3.15-global.2", 0, false},
 	}
 	for _, c := range cases {
 		got, ok := CompareVersions(c.a, c.b)
@@ -100,6 +113,23 @@ func TestCompareVersions(t *testing.T) {
 		if ok && got != c.want {
 			t.Errorf("CompareVersions(%q,%q)=%d, 期望 %d", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+// TestRepoIsTheFork pins the release source to the repository this fork actually
+// publishes to. It was left pointing at upstream Autumn-27/artex, whose
+// releases/latest returns 404, so every update check failed and the UI blamed the
+// network ("Can't connect to GitHub: ... set the global proxy") even though GitHub
+// was reachable. A test keeps the next rename from silently breaking updates again.
+func TestRepoIsTheFork(t *testing.T) {
+	if Repo != "jiwoochris/artex-global" {
+		t.Fatalf("Repo 는 이 포크의 릴리스 저장소여야 합니다: %q", Repo)
+	}
+	if strings.Contains(latestURL, "Autumn-27") {
+		t.Fatalf("latestURL 이 여전히 상류 저장소를 가리킵니다: %s", latestURL)
+	}
+	if !strings.Contains(latestURL, Repo) {
+		t.Fatalf("latestURL(%s)에 Repo(%s)가 반영되지 않았습니다", latestURL, Repo)
 	}
 }
 

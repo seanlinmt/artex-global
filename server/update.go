@@ -156,7 +156,7 @@ func (h *updateHub) begin(version string) bool {
 		return false
 	}
 	h.running = true
-	h.cur = updateProgress{Phase: selfupdate.PhaseDownload, Percent: 0, Message: updateMsgPreparing, Version: version}
+	h.cur = updateProgress{Phase: selfupdate.PhaseDownload, Percent: 0, Message: trMsg(updateMsgPreparing), Version: version}
 	h.fanout(h.cur)
 	return true
 }
@@ -167,9 +167,9 @@ func (h *updateHub) finish(err error) {
 	defer h.mu.Unlock()
 	h.running = false
 	if err != nil {
-		h.cur = updateProgress{Phase: selfupdate.PhaseFailed, Percent: -1, Message: updateMsgFailed, Error: err.Error(), Version: h.cur.Version}
+		h.cur = updateProgress{Phase: selfupdate.PhaseFailed, Percent: -1, Message: trMsg(updateMsgFailed), Error: err.Error(), Version: h.cur.Version}
 	} else {
-		h.cur = updateProgress{Phase: selfupdate.PhaseStaged, Percent: 100, Message: updateMsgStaged, Version: h.cur.Version}
+		h.cur = updateProgress{Phase: selfupdate.PhaseStaged, Percent: 100, Message: trMsg(updateMsgStaged), Version: h.cur.Version}
 	}
 	h.fanout(h.cur)
 }
@@ -271,7 +271,7 @@ func (s *Server) updateCheck(w http.ResponseWriter, r *http.Request) {
 	if !comparable {
 		// 开发构建（dev / git describe 带后缀）没有可比较的版本号。放行只会
 		// 用正式版覆盖掉本地正在调试的二进制，所以直接不给更新。
-		out["reason"] = fmt.Sprintf(updateErrNotReleaseFmt, current)
+		out["reason"] = fmt.Sprintf(trMsg(updateErrNotReleaseFmt), current)
 	}
 	writeJSON(w, 200, out)
 }
@@ -292,11 +292,11 @@ func (s *Server) updateApply(w http.ResponseWriter, r *http.Request) {
 	}
 	cmp, comparable := selfupdate.CompareVersions(current, rel.TagName)
 	if !comparable {
-		writeErr(w, 400, fmt.Sprintf(updateErrNotReleaseFmt, current))
+		writeErr(w, 400, fmt.Sprintf(trMsg(updateErrNotReleaseFmt), current))
 		return
 	}
 	if cmp >= 0 {
-		writeErr(w, 400, fmt.Sprintf(updateErrAlreadyLatestFmt, current))
+		writeErr(w, 400, fmt.Sprintf(trMsg(updateErrAlreadyLatestFmt), current))
 		return
 	}
 	if !updHub.begin(rel.TagName) {

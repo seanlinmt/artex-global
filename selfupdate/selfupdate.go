@@ -22,7 +22,6 @@ package selfupdate
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -56,7 +55,7 @@ type Paths struct {
 func ResolvePaths() (Paths, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		return Paths{}, fmt.Errorf("실행 파일 위치 확인 실패: %w", err)
+		return Paths{}, errf("실행 파일 위치 확인 실패: %w", err)
 	}
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
@@ -123,40 +122,118 @@ func CompareVersions(a, b string) (int, bool) {
 		return 0, false
 	}
 	for i := range 3 {
-		if av[i] != bv[i] {
-			if av[i] < bv[i] {
+		if av.nums[i] != bv.nums[i] {
+			if av.nums[i] < bv.nums[i] {
 				return -1, true
 			}
 			return 1, true
 		}
 	}
+	// 숫자 부분이 같으면 에디션 접미부를 비교한다. 접미부가 없는 태그(상류식 "0.3.15")는
+	// 그 에디션의 첫 빌드보다 앞선 것으로 본다: "0.3.15-global.1" 은 0.3.15 에서 파생된
+	// 이후 빌드이므로, 그 반대로 판정하면 포크가 자기 릴리스를 "이미 최신" 으로 놓친다.
+	if av.hasEdition != bv.hasEdition {
+		if !av.hasEdition {
+			return -1, true
+		}
+		return 1, true
+	}
+	if av.edition != bv.edition {
+		if av.edition < bv.edition {
+			return -1, true
+		}
+		return 1, true
+	}
+	switch {
+	case av.build < bv.build:
+		return -1, true
+	case av.build > bv.build:
+		return 1, true
+	}
 	return 0, true
 }
 
-// parseVersion 解析 "v0.3.7" / "0.3.7" 形式的版本号为 [3]int。
+// version 是解析后的版本号：三段式数字，加上可选的发行版后缀(예: "global.1")。
 //
-// 只接受纯净的三段式：build.sh 在非 tag 构建时用 git describe 产出
-// "0.3.7-2-gabc1234" 这类带后缀的版本，它们必须被判为不可比较，而不是被当成
-// 0.3.7 —— 否则开发构建会被误判为"已是最新"或被正式版覆盖。
-func parseVersion(s string) ([3]int, bool) {
+// 이 포크의 릴리스 태그는 "v0.3.15-global.1" 처럼 에디션 접미부를 달고 나옵니다. 예전
+// 파서는 순수 삼단식만 받아서 이 태그를 전부 "비교 불가" 로 판정했고, 그 결과 포크에서는
+// 원클릭 업데이트가 항상 비활성이었습니다(릴리스가 있어도 "이미 최신" 조차 못 물어봄).
+type version struct {
+	nums       [3]int
+	edition    string // 예: "global"; 접미부가 없으면 빈 문자열
+	build      int    // 예: 1
+	hasEdition bool
+}
+
+// parseVersion 解析 "v0.3.7" / "0.3.7" / "v0.3.15-global.1" 형식의 버전을 파싱합니다.
+//
+// 접미부는 "에디션이름.빌드번호"(소문자 영숫자 에디션 + 숫자)만 인정합니다. 이 규칙이
+// git describe 산출물("0.3.7-2-gabc1234" — 접미부가 하이픈으로 두 번 갈라짐)과
+// "0.3.7-dirty"(점도 숫자도 없음)를 개발 빌드로 남겨 두는 장치입니다. 그것들을
+// 비교 가능으로 오판하면 미커밋 변경이 담긴 바이너리를 정식 릴리스로 덮어씁니다.
+func parseVersion(s string) (version, bool) {
 	s = strings.TrimSpace(s)
 	s = strings.TrimPrefix(s, "v")
 	if s == "" {
-		return [3]int{}, false
+		return version{}, false
 	}
+	core := s
+	if i := strings.IndexByte(s, '-'); i >= 0 {
+		core = s[:i]
+		if strings.Contains(s[i+1:], "-") {
+			return version{}, false // git describe: "0.3.7-2-gabc1234"
+		}
+		ed, build, ok := parseEdition(s[i+1:])
+		if !ok {
+			return version{}, false
+		}
+		var out version
+		if _, ok := parseCore(core, &out); !ok {
+			return version{}, false
+		}
+		out.edition, out.build, out.hasEdition = ed, build, true
+		return out, true
+	}
+	var out version
+	if _, ok := parseCore(core, &out); !ok {
+		return version{}, false
+	}
+	return out, true
+}
+
+// parseCore 解析纯三段式数字部分。
+func parseCore(s string, out *version) ([3]int, bool) {
 	parts := strings.Split(s, ".")
 	if len(parts) != 3 {
 		return [3]int{}, false
 	}
-	var out [3]int
 	for i, p := range parts {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 0 {
 			return [3]int{}, false
 		}
-		out[i] = n
+		out.nums[i] = n
 	}
-	return out, true
+	return out.nums, true
+}
+
+// parseEdition 解析 "<에디션>.<빌드번호>" 접미부. 예: "global.1" → ("global", 1, true).
+func parseEdition(s string) (string, int, bool) {
+	dot := strings.LastIndexByte(s, '.')
+	if dot <= 0 || dot == len(s)-1 {
+		return "", 0, false
+	}
+	ed := s[:dot]
+	for _, c := range ed {
+		if !(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') {
+			return "", 0, false // "dirty" 같은 개발 접미부, 또는 대문자·기호
+		}
+	}
+	build, err := strconv.Atoi(s[dot+1:])
+	if err != nil || build < 0 {
+		return "", 0, false
+	}
+	return ed, build, true
 }
 
 // InDocker 报告进程是否跑在容器里。Docker 下换装写的是容器可写层，
