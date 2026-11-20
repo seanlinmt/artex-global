@@ -3854,5 +3854,24 @@
     "evidence": "证据",
     "rootCause": "根因分析",
     "remediation": "修复建议"
+  },
+  "builtinRuleMessages": {
+    "rmRf": "禁止执行递归强制删除（rm -rf / rm --recursive），可能永久损坏系统或靶机环境",
+    "rmSystemDirs": "禁止删除系统关键路径",
+    "mkfs": "禁止格式化磁盘（mkfs）",
+    "ddOverwrite": "禁止使用 dd 覆写磁盘设备",
+    "forkBomb": "禁止执行 Fork 炸弹",
+    "shutdownReboot": "禁止执行关机或重启命令",
+    "killAll": "禁止 kill -9 -1 或 killall -9（杀死所有进程）",
+    "shredWipe": "禁止对磁盘设备执行 shred/wipe 擦除",
+    "flushFirewall": "禁止清空防火墙规则（iptables -F / nft flush）",
+    "sqlDrop": "禁止执行 DROP 操作，可能不可逆地销毁数据库对象",
+    "sqlTruncate": "禁止执行 TRUNCATE，可能清空数据表所有数据",
+    "mongoDrop": "禁止执行 MongoDB drop 操作",
+    "redisFlush": "禁止执行 Redis FLUSHALL / FLUSHDB，可能清空全部缓存数据",
+    "curlWgetDelete": "禁止通过 curl/wget 发送 HTTP DELETE 请求，可能删除目标系统数据",
+    "pythonHttpDelete": "禁止使用 Python HTTP 客户端发送 DELETE 请求",
+    "scriptHttpDelete": "禁止在脚本中声明并发送 HTTP DELETE 请求",
+    "bulkClearPath": "禁止调用批量清空或销毁类接口（/clear /wipe /flush /purge 等）"
   }
 }

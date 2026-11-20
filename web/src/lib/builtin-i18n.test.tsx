@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import ko from "../../messages/ko.json";
 import { useAgentLabels } from "./agent-i18n";
 import { useBuiltinLabels } from "./builtin-i18n";
+import ruleMessageSources from "./builtin-rule-messages.json";
 import toolSources from "./builtin-tool-sources.json";
 
 function labelsOf<T>(useLabels: () => T): T {
@@ -45,6 +46,12 @@ describe("useBuiltinLabels", () => {
   it("커스텀 도구는 번역하지 않는다", () => {
     const description = toolSources.add_hint;
     expect(labels.toolDescription({ key: "add_hint", system: false, description })).toBe(description);
+  });
+
+  it("시드 차단 사유는 번역하고 사용자가 고친 사유는 그대로 둔다", () => {
+    expect(labels.ruleMessage("[内置] 磁盘格式化 mkfs", ruleMessageSources.mkfs)).toBe(ko.builtinRuleMessages.mkfs);
+    expect(labels.ruleMessage("[内置] 磁盘格式化 mkfs", "수정한 사유")).toBe("수정한 사유");
+    expect(labels.ruleMessage("[内置] 破坏性系统命令", "")).toBe("");
   });
 
   it("모든 시스템 도구 설명을 번역하며 중괄호가 있어도 실패하지 않는다", () => {

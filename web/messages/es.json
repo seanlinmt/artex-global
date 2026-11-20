@@ -3854,5 +3854,24 @@
     "evidence": "Evidencias",
     "rootCause": "Análisis de causa raíz",
     "remediation": "Recomendaciones de corrección"
+  },
+  "builtinRuleMessages": {
+    "rmRf": "Se bloquea la eliminación recursiva forzada (rm -rf / rm --recursive); puede dañar de forma permanente el sistema o el entorno de destino",
+    "rmSystemDirs": "Se bloquea la eliminación de rutas críticas del sistema",
+    "mkfs": "Se bloquea el formateo de disco (mkfs)",
+    "ddOverwrite": "Se bloquea la sobrescritura de un dispositivo de disco con dd",
+    "forkBomb": "Se bloquea la ejecución de una fork bomb",
+    "shutdownReboot": "Se bloquea la ejecución de comandos de apagado o reinicio",
+    "killAll": "Se bloquea kill -9 -1 o killall -9 (matar todos los procesos)",
+    "shredWipe": "Se bloquea el borrado shred/wipe sobre un dispositivo de disco",
+    "flushFirewall": "Se bloquea el vaciado de reglas de firewall (iptables -F / nft flush)",
+    "sqlDrop": "Se bloquea la operación DROP; puede destruir objetos de base de datos de forma irreversible",
+    "sqlTruncate": "Se bloquea TRUNCATE; puede borrar todas las filas de la tabla",
+    "mongoDrop": "Se bloquean las operaciones drop de MongoDB",
+    "redisFlush": "Se bloquea Redis FLUSHALL / FLUSHDB; puede borrar todos los datos en caché",
+    "curlWgetDelete": "Se bloquea el envío de solicitudes HTTP DELETE con curl/wget; puede eliminar datos del sistema de destino",
+    "pythonHttpDelete": "Se bloquea el envío de solicitudes DELETE con un cliente HTTP de Python",
+    "scriptHttpDelete": "Se bloquea declarar y enviar solicitudes HTTP DELETE desde un script",
+    "bulkClearPath": "Se bloquea la llamada a endpoints de borrado masivo/destrucción (/clear /wipe /flush /purge, etc.)"
   }
 }

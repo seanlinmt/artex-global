@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { useTranslations } from "next-intl";
 
+import ruleMessageSources from "./builtin-rule-messages.json";
 import toolSources from "./builtin-tool-sources.json";
 
 // 기본 차단 규칙 이름·자산 규칙 메모·도구 설명은 DB 시드 데이터라 언어별로 둘 수 없다.
@@ -42,6 +43,8 @@ const ASSET_NOTE_KEYS: Record<string, string> = {
 
 const TOOL_SOURCES: Record<string, string> = toolSources;
 
+const RULE_MESSAGE_SOURCES: Record<string, string> = ruleMessageSources;
+
 // 보고서 에이전트 프롬프트(agent/promptcatalog.go)가 지정한 중국어 소제목. 저장된 보고서는
 // 고치지 않고 표시할 때만 바꾼다. 복사·내보내기는 원문 그대로다. PoC 는 번역하지 않는다.
 const REPORT_HEADING_KEYS: Record<string, string> = {
@@ -56,6 +59,7 @@ const REPORT_HEADING_KEYS: Record<string, string> = {
 
 export function useBuiltinLabels() {
   const tRule = useTranslations("builtinRules");
+  const tRuleMsg = useTranslations("builtinRuleMessages");
   const tNote = useTranslations("builtinAssetNotes");
   const tTool = useTranslations("builtinTools");
   const tHeading = useTranslations("builtinReportHeadings");
@@ -64,6 +68,15 @@ export function useBuiltinLabels() {
     const ruleName = (name: string): string => {
       const key = RULE_KEYS[name];
       return key && tRule.has(key) ? (tRule.raw(key) as string) : name;
+    };
+
+    // 차단 사유는 규칙 시드 메시지일 때만 번역한다. 사용자가 고친 규칙은 원문 유지.
+    const ruleMessage = (ruleName: string, message: string): string => {
+      const key = RULE_KEYS[ruleName];
+      if (key && RULE_MESSAGE_SOURCES[key] === message && tRuleMsg.has(key)) {
+        return tRuleMsg.raw(key) as string;
+      }
+      return message;
     };
 
     const assetNote = (note: string): string => {
@@ -93,6 +106,6 @@ export function useBuiltinLabels() {
         .join("\n");
     };
 
-    return { ruleName, assetNote, toolDescription, reportHeadings };
-  }, [tRule, tNote, tTool, tHeading]);
+    return { ruleName, ruleMessage, assetNote, toolDescription, reportHeadings };
+  }, [tRule, tRuleMsg, tNote, tTool, tHeading]);
 }

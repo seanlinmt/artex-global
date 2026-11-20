@@ -3854,5 +3854,24 @@
     "evidence": "Evidence",
     "rootCause": "Root Cause Analysis",
     "remediation": "Remediation"
+  },
+  "builtinRuleMessages": {
+    "rmRf": "Recursive forced deletion (rm -rf / rm --recursive) is blocked; it can permanently damage the system or the target environment",
+    "rmSystemDirs": "Deleting critical system paths is blocked",
+    "mkfs": "Formatting a disk (mkfs) is blocked",
+    "ddOverwrite": "Overwriting a disk device with dd is blocked",
+    "forkBomb": "Running a fork bomb is blocked",
+    "shutdownReboot": "Shutting down or rebooting is blocked",
+    "killAll": "kill -9 -1 or killall -9 (killing all processes) is blocked",
+    "shredWipe": "Running shred/wipe against a disk device is blocked",
+    "flushFirewall": "Flushing firewall rules (iptables -F / nft flush) is blocked",
+    "sqlDrop": "DROP is blocked; it can irreversibly destroy database objects",
+    "sqlTruncate": "TRUNCATE is blocked; it can wipe every row in the table",
+    "mongoDrop": "MongoDB drop operations are blocked",
+    "redisFlush": "Redis FLUSHALL / FLUSHDB is blocked; it can clear all cached data",
+    "curlWgetDelete": "Sending an HTTP DELETE with curl/wget is blocked; it can delete data on the target",
+    "pythonHttpDelete": "Sending a DELETE with a Python HTTP client is blocked",
+    "scriptHttpDelete": "Declaring and sending an HTTP DELETE from a script is blocked",
+    "bulkClearPath": "Calling bulk clear / destroy endpoints (/clear /wipe /flush /purge etc.) is blocked"
   }
 }

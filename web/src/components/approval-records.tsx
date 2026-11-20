@@ -117,7 +117,8 @@ function StatusBadge({ status }: { status: string }) {
 function MatchCell({ row, showReason = true }: { row: InterceptApprovalRow; showReason?: boolean }) {
   const t = useTranslations("approval");
   const builtinLabels = useBuiltinLabels();
-  const reason = row.reason?.replace(/^\[模型\]\s*/, "");
+  const rawReason = row.reason?.replace(/^\[模型\]\s*/, "");
+  const reason = rawReason && row.rule_name ? builtinLabels.ruleMessage(row.rule_name, rawReason) : rawReason;
   return (
     <div className="flex min-w-0 flex-col gap-1">
       {source(row) === "model" ? (
@@ -347,6 +348,9 @@ export function ApprovalDetail({
   if (audit?.model_fallback) initialLabel = t("modelFallback");
   const agentName =
     current.agent_name || (current.conv_agent_key && agentNameOf(current.conv_agent_key)) || t("agentFallback");
+  const currentReason = current.reason
+    ? builtinLabels.ruleMessage(current.rule_name, current.reason.replace(/^\[模型\]\s*/, ""))
+    : "";
 
   return (
     <div className="flex min-w-0 flex-col gap-4 p-3 sm:p-5">
@@ -382,7 +386,7 @@ export function ApprovalDetail({
             <MatchCell row={current} showReason={false} />
           </div>
           <p className="whitespace-pre-wrap break-words text-sm leading-7 [overflow-wrap:anywhere]">
-            {current.reason?.replace(/^\[模型\]\s*/, "") || t("noApprovalReason")}
+            {currentReason || t("noApprovalReason")}
           </p>
           {audit?.decision_reason ? <p className="text-sm">{audit.decision_reason}</p> : null}
           {audit?.effective_action ? (
@@ -498,7 +502,10 @@ export function ApprovalDetail({
               ) : null}
               <CodeBlock
                 label={`${initialLabel}: ${t.has(`action.${audit.initial_action}`) ? t(`action.${audit.initial_action}`) : audit.initial_action}`}
-                text={audit.initial_reason.replace(/^\[模型\]\s*/, "")}
+                text={builtinLabels.ruleMessage(
+                  audit.rule_name ?? "",
+                  audit.initial_reason.replace(/^\[模型\]\s*/, ""),
+                )}
               />
               <CodeBlock
                 label={t("executionOutput")}

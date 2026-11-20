@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Autumn-27/artex/config"
 )
 
 // EvidenceExchange exposes complete captured bodies only during the callback.
@@ -28,7 +30,7 @@ type EvidenceExchange struct {
 
 func (t *Traffic) ReadEvidence(ctx context.Context, ids []string, consume func(EvidenceExchange) error) error {
 	if t == nil {
-		return errors.New("流量录制存储不可用")
+		return errors.New(config.TrMsg("流量录制存储不可用"))
 	}
 	t.wmu.Lock()
 	defer t.wmu.Unlock()
@@ -37,7 +39,7 @@ func (t *Traffic) ReadEvidence(ctx context.Context, ids []string, consume func(E
 			return err
 		}
 		if err := t.readEvidence(id, consume); err != nil {
-			return fmt.Errorf("流量 %s: %w", id, err)
+			return fmt.Errorf(config.TrMsg("流量 %s: %w"), id, err)
 		}
 	}
 	return nil
@@ -56,7 +58,7 @@ func (t *Traffic) readEvidence(id string, consume func(EvidenceExchange) error) 
 		Scan(&e.ReqHead, &req, &reqBlob, &e.RespHead, &resp, &respBlob)
 	if errors.Is(err, sql.ErrNoRows) && legacy != "" {
 		if !filepath.IsLocal(legacy) {
-			return errors.New("旧流量路径无效")
+			return errors.New(config.TrMsg("旧流量路径无效"))
 		}
 		r, err := os.Open(filepath.Join(t.dir, legacy, "request.http"))
 		if err != nil {
@@ -114,7 +116,7 @@ func splitLegacyEvidence(r io.Reader) (string, io.Reader, error) {
 		}
 		head.WriteString(line)
 		if head.Len() > 1<<20 {
-			return "", nil, errors.New("旧流量报文头过大")
+			return "", nil, errors.New(config.TrMsg("旧流量报文头过大"))
 		}
 		if errors.Is(err, io.EOF) {
 			return head.String(), b, nil

@@ -3854,5 +3854,24 @@
     "evidence": "証拠",
     "rootCause": "根本原因分析",
     "remediation": "修正の推奨事項"
+  },
+  "builtinRuleMessages": {
+    "rmRf": "再帰的な強制削除（rm -rf / rm --recursive）を禁止します。システムや対象環境を恒久的に破損する可能性があります",
+    "rmSystemDirs": "システムの重要なパスの削除を禁止します",
+    "mkfs": "ディスクのフォーマット（mkfs）を禁止します",
+    "ddOverwrite": "dd によるディスクデバイスの上書きを禁止します",
+    "forkBomb": "Fork ボムの実行を禁止します",
+    "shutdownReboot": "シャットダウンまたは再起動コマンドの実行を禁止します",
+    "killAll": "kill -9 -1 または killall -9（全プロセスの終了）を禁止します",
+    "shredWipe": "ディスクデバイスに対する shred/wipe 消去を禁止します",
+    "flushFirewall": "ファイアウォールルールのクリア（iptables -F / nft flush）を禁止します",
+    "sqlDrop": "DROP 操作を禁止します。データベースオブジェクトを不可逆的に破壊する可能性があります",
+    "sqlTruncate": "TRUNCATE を禁止します。テーブルの全行を消去する可能性があります",
+    "mongoDrop": "MongoDB の drop 操作を禁止します",
+    "redisFlush": "Redis FLUSHALL / FLUSHDB を禁止します。すべてのキャッシュデータを消去する可能性があります",
+    "curlWgetDelete": "curl/wget による HTTP DELETE リクエストの送信を禁止します。対象システムのデータを削除する可能性があります",
+    "pythonHttpDelete": "Python の HTTP クライアントによる DELETE リクエストの送信を禁止します",
+    "scriptHttpDelete": "スクリプト内で HTTP DELETE メソッドを宣言して送信することを禁止します",
+    "bulkClearPath": "一括クリア/破棄系エンドポイント（/clear /wipe /flush /purge など）の呼び出しを禁止します"
   }
 }
