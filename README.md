@@ -164,6 +164,44 @@ There is a single admin account (`ARTEX`) whose password is created on the first
 - **Changing the password ends every session.** The token signing key is bound to the password hash, so tokens issued before a change (from the UI, `reset-password.sh`, or a direct DB edit) stop working within seconds. When recovering from a compromised account, also review custom tools, MCP, LLM and notification settings after changing the password.
 - **CORS.** `/api` only answers cross-origin browser calls from origins listed in `ARTEX_CORS_ORIGINS` (comma-separated). The embedded UI is same-origin, so this is normally empty; the default only allows `next dev` from `dev.sh` (`http://localhost:5173`).
 
+### Choosing the network interface (`bind.sh` and the dual-network layout)
+
+There are **two independent layers** here, and they solve different problems. Keeping them separate matters, because conflating them is the most common mistake.
+
+**1. Which host interface the UI is published on.** `docker-compose.yml` publishes to `${ARTEX_BIND:-127.0.0.1}:8787`. `bind.sh` sets that value from the interface you pick and recreates the container:
+
+```bash
+./bind.sh list     # interfaces with IPv4 addresses on this host
+./bind.sh local    # 127.0.0.1 only (default, loopback)
+./bind.sh lan      # the wired LAN address only
+./bind.sh wifi     # the Wi-Fi address only
+./bind.sh any      # 0.0.0.0, every interface
+./bind.sh en12     # a named interface
+./bind.sh status   # current binding and published ports
+```
+
+`lan` and `wifi` resolve the address at run time (`ARTEX_LAN_IFACE` / `ARTEX_WIFI_IFACE` override auto-detection). Publishing to one interface means the other one **refuses** connections — this is the point, not a bug. Recreating the container interrupts running tasks.
+
+> **DHCP rotation is the sharp edge.** The binding pins the *current lease*, so if the address changes the published port points at a stale IP and the UI stops answering. Measured leases here were 1 hour on Wi-Fi and 30 minutes on the wired LAN, and switching access points changed the Wi-Fi address mid-session. Re-run `./bind.sh wifi` (or `lan`) to re-resolve and rewrite it; `./bind.sh any` survives rotation but also exposes every interface.
+
+**2. The container's own network paths.** `docker-compose.yml` attaches `artex` to two bridges, which appear inside the container as `eth0` and `eth1`:
+
+- `internal` — `internal: true`, so it **cannot route out**. Only `postgres` and artex's DB traffic live here; `postgres` is attached to this network alone, so the DB port is never exposed to the egress side.
+- `external` — the egress path for scans and internet access. This is the container's default route.
+
+Verify from inside the container (the image has no `ip` command; use `/proc`):
+
+```bash
+docker exec artex-global-artex-1 cat /proc/net/dev            # eth0 / eth1 present
+docker exec artex-global-artex-1 hostname -I                  # both addresses
+docker exec artex-global-artex-1 cat /proc/net/route          # default route
+docker network inspect artex-global_internal --format '{{.Internal}}'   # true
+```
+
+> **On Docker Desktop (macOS) these bridges do *not* map to your physical interfaces.** The Linux VM only sees its own `eth0`/`eth1` (for example `192.168.65.3` and `192.168.64.3`); the host's `en0`/`en12` do not exist inside it, so `ipvlan`/`macvlan` with `-o parent=en12` fails (`invalid pool request: Pool overlaps…`, or `invalid subinterface vlan name en12`). Both bridges therefore leave through the same host path. **Host-interface selection is `bind.sh`'s job, not the bridge's.** On a Linux host you can parent `external` directly to a physical NIC with `ipvlan`/`macvlan` and get true interface-level isolation.
+
+**Not published on purpose:** the traffic-recording proxy (`8788`) stays on `127.0.0.1`. It MITMs TLS with its own CA and is consumed by the agents inside the container, so an external browser never needs to reach it.
+
 ### Reverse-proxy deployment (HTTPS / expose only 443)
 
 The frontend and the API/SSE are both served by the same backend port (default `:8787`), and the live activity stream connects **same-origin** by default. So there is no need to set `NEXT_PUBLIC_SSE_BASE` separately: expose only 443 to the public network and keep 8787 internal.

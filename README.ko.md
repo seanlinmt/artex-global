@@ -169,6 +169,44 @@ docker compose up -d          # artex 이미지 + postgres 를 함께 기동
 - **비밀번호를 바꾸면 기존 세션이 모두 끊깁니다.** 토큰 서명 키가 비밀번호 해시에 묶여 있어서, 화면의 비밀번호 변경·`reset-password.sh`·DB 직접 수정 어느 쪽이든 이전에 발급된 토큰은 몇 초 안에 무효가 됩니다. 계정이 유출된 뒤 복구할 때는 비밀번호를 바꾼 다음 커스텀 도구·MCP·LLM·알림 설정도 함께 점검하십시오.
 - **CORS.** `/api` 는 `ARTEX_CORS_ORIGINS`(쉼표 구분)에 적힌 출처에만 교차 출처 호출을 허용합니다. 내장 UI 는 동일 출처라 보통 비워 두고, 기본값은 `dev.sh` 의 `next dev`(`http://localhost:5173`)만 허용합니다.
 
+### 네트워크 인터페이스 선택 (`bind.sh` 와 이중 네트워크 구성)
+
+여기에는 **서로 다른 두 계층**이 있고, 각각 다른 문제를 풉니다. 이 둘을 섞으면 가장 흔한 실수가 됩니다.
+
+**1. UI 를 호스트의 어느 인터페이스에 게시할지.** `docker-compose.yml` 은 `${ARTEX_BIND:-127.0.0.1}:8787` 로 게시합니다. `bind.sh` 는 고른 인터페이스의 주소로 그 값을 바꾸고 컨테이너를 다시 만듭니다:
+
+```bash
+./bind.sh list     # 이 호스트의 인터페이스와 IPv4 주소
+./bind.sh local    # 127.0.0.1 만(기본값, 루프백)
+./bind.sh lan      # 유선 LAN 주소만
+./bind.sh wifi     # Wi-Fi 주소만
+./bind.sh any      # 0.0.0.0, 모든 인터페이스
+./bind.sh en12     # 인터페이스 이름 직접 지정
+./bind.sh status   # 현재 바인딩과 게시 포트
+```
+
+`lan`·`wifi` 는 실행 시점에 주소를 조회합니다(`ARTEX_LAN_IFACE` / `ARTEX_WIFI_IFACE` 로 자동 감지를 덮어쓸 수 있음). 한 인터페이스에만 게시하면 나머지 인터페이스는 연결을 **거부**합니다. 이건 의도된 동작입니다. 컨테이너를 다시 만들면 실행 중인 작업은 중단됩니다.
+
+> **DHCP 로 주소가 바뀌는 것이 가장 위험한 지점입니다.** 바인딩은 *현재 리스* 를 고정하므로, 주소가 바뀌면 게시 포트가 낡은 IP 를 가리켜 UI 가 응답하지 않습니다. 실측 리스는 Wi-Fi 1시간·유선 LAN 30분이었고, 액세스 포인트를 바꾸자 세션 도중에 Wi-Fi 주소가 실제로 바뀌었습니다. 같은 명령(`./bind.sh wifi` 또는 `lan`)을 다시 실행하면 새 주소로 갱신됩니다. `./bind.sh any` 는 주소 변경에도 살아남지만 모든 인터페이스를 노출합니다.
+
+**2. 컨테이너 자체의 네트워크 경로.** `docker-compose.yml` 은 `artex` 를 두 브리지에 붙이고, 컨테이너 안에서 `eth0`·`eth1` 로 나타납니다:
+
+- `internal` — `internal: true` 라서 **외부로 나갈 수 없습니다.** `postgres` 와 artex 의 DB 통신만 여기에 있고, `postgres` 는 이 망에만 붙으므로 DB 포트가 egress 쪽에 노출되지 않습니다.
+- `external` — 스캔 대상과 인터넷으로 나가는 egress 경로이며 컨테이너의 기본 라우트입니다.
+
+컨테이너 안에서 확인하십시오(이미지에 `ip` 명령이 없으므로 `/proc` 을 씁니다):
+
+```bash
+docker exec artex-global-artex-1 cat /proc/net/dev            # eth0 / eth1 존재
+docker exec artex-global-artex-1 hostname -I                  # 두 주소
+docker exec artex-global-artex-1 cat /proc/net/route          # 기본 라우트
+docker network inspect artex-global_internal --format '{{.Internal}}'   # true
+```
+
+> **Docker Desktop(macOS)에서는 이 브리지가 물리 인터페이스와 대응하지 않습니다.** 리눅스 VM 은 자기 `eth0`/`eth1`(예: `192.168.65.3`, `192.168.64.3`)만 보고 호스트의 `en0`/`en12` 는 VM 안에 존재하지 않습니다. 그래서 `-o parent=en12` 로 `ipvlan`/`macvlan` 을 만들면 실패합니다(`invalid pool request: Pool overlaps…` 또는 `invalid subinterface vlan name en12`). 두 브리지 모두 같은 호스트 경로로 나가며, **호스트 인터페이스 선택은 `bind.sh` 의 일이지 브리지의 일이 아닙니다.** 리눅스 호스트에서는 `external` 을 물리 NIC 에 직접 parent 로 붙여 진짜 인터페이스 격리를 얻을 수 있습니다.
+
+**의도적으로 게시하지 않는 것:** 트래픽 기록 프록시(`8788`)는 `127.0.0.1` 에만 둡니다. 자체 CA 로 TLS 를 복호화하고 컨테이너 안의 에이전트가 쓰는 것이라, 외부 브라우저가 접근할 필요가 없습니다.
+
 ### 리버스 프록시 배포 (HTTPS / 443 만 개방)
 
 프런트엔드와 API/SSE 모두 같은 백엔드 포트(기본 `:8787`)가 제공하고, 실시간 활동 스트림은 기본적으로 **동일 출처(same-origin)** 로 연결합니다. 따라서 `NEXT_PUBLIC_SSE_BASE` 를 따로 설정할 필요 없이, 공개망에는 443 만 열고 8787 은 내부망에 두면 됩니다.

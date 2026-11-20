@@ -13,6 +13,10 @@ services:
       timeout: 3s
       retries: 10
     restart: unless-stopped
+    networks:
+      # DB 는 내부망에만 붙입니다. egress 망(external)에 붙이면 DB 포트가 그 망에서도
+      # 보이므로, 접근 경로를 하나로 줄여 둡니다.
+      - internal
 
   artex:
     # 이 포크가 릴리스 태그(v*)마다 GitHub Container Registry 에 발행하는 이미지입니다
@@ -36,13 +40,14 @@ services:
       ARTEX_ADMIN_PASSWORD: ${ARTEX_ADMIN_PASSWORD:-}
       # 브라우저 교차 출처 허용 목록(쉼표 구분). 내장 UI 는 동일 출처라 보통 비워 둡니다.
       ARTEX_CORS_ORIGINS: ${ARTEX_CORS_ORIGINS:-}
-      # 서버 쪽 기본 출력 언어(ko·en·zh·es). 비우면 한국어입니다. 에이전트 출력·오류 메시지는 설정 화면의
-      # "표시 언어"가 우선하고, 서버 콘솔 로그는 이 값만 따릅니다.
+      # 서버 쪽 기본 출력 언어(ko·en·zh·es). 비우면 한국어입니다. 에이전트 출력·오류 메시지는
+      # 설정 화면의 "표시 언어"가 우선하고, 서버 콘솔 로그는 이 값만 따릅니다.
       ARTEX_LANG: ${ARTEX_LANG:-}
     ports:
       # 기본값은 호스트의 127.0.0.1 에만 게시합니다. 다른 기기에서 직접 접속하려면 .env 에
       # ARTEX_BIND=0.0.0.0 을 두되, 그 전에 반드시 초기 설정(관리자 비밀번호)을 마치고
       # 가능하면 README 의 리버스 프록시(HTTPS) 구성을 쓰십시오.
+      # 인터페이스를 골라 노출하려면 ./bind.sh (local|lan|wifi|any) 를 쓰십시오.
       - "${ARTEX_BIND:-127.0.0.1}:8787:8787"
       - "127.0.0.1:8788:8788"
     volumes:
@@ -53,6 +58,26 @@ services:
       # skill 을 고치면 이미지를 다시 빌드할 필요 없이, 컨테이너가 호스트의 이 파일을 그대로 읽습니다.
       - ./skills:/app/skills
     restart: unless-stopped
+    networks:
+      # 두 개의 브리지 망을 붙이면 컨테이너 안에 eth0(internal)·eth1(external) 이 생깁니다.
+      #   internal : postgres 와 통신하는 사설망(외부로 나가지 않음, internal: true).
+      #   external : 스캔 대상·인터넷으로 나가는 egress 망.
+      # 주의: 이 두 망은 컨테이너의 *네트워크 경로* 를 나눌 뿐, 호스트의 LAN/Wi-Fi 인터페이스와
+      # 1:1 로 대응하지 않습니다. Docker Desktop(macOS)에서는 VM 이 호스트 NIC 를 보지 못하므로
+      # 두 망 모두 같은 호스트 경로로 나갑니다. 호스트 인터페이스를 고르는 것은 포트 게시
+      # (./bind.sh) 쪽 일입니다.
+      - internal
+      - external
 
 volumes:
   pgdata:
+
+networks:
+  # 사설 내부망: 외부로 라우팅되지 않습니다(internal: true). DB 와 앱의 내부 통신 전용.
+  internal:
+    driver: bridge
+    internal: true
+  # egress 망: 컨테이너가 스캔 대상·인터넷으로 나가는 경로. 기본 브리지와 같은 방식으로
+  # 호스트 NAT 를 통해 나갑니다.
+  external:
+    driver: bridge
