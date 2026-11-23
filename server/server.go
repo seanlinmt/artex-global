@@ -3197,7 +3197,7 @@ func (s *Server) activityDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]any{"detail": d})
+	writeJSON(w, 200, map[string]any{"detail": agent.DisplayDetail(d)})
 }
 
 // taskActivityDetail keeps the legacy local-task behavior (including thinking

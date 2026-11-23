@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/Autumn-27/artex/agent"
 	"github.com/Autumn-27/artex/db"
 	"github.com/Autumn-27/artex/traffic"
 )
@@ -190,10 +192,24 @@ type TaskNodeDTO struct {
 }
 
 func taskNodeDTO(n *db.Node) TaskNodeDTO {
+	payload := rawString(n.Payload)
+	if n.Kind == "intent" && strings.Contains(payload, "完成任务目标：") {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(payload), &obj); err == nil {
+			if summary, ok := obj["summary"].(string); ok {
+				if tr := translateSeedIntentSummary(summary); tr != summary {
+					obj["summary"] = tr
+					if raw, err := json.Marshal(obj); err == nil {
+						payload = string(raw)
+					}
+				}
+			}
+		}
+	}
 	d := TaskNodeDTO{
 		ID:           i64s(n.ID),
 		Type:         n.Kind,
-		Payload:      rawString(n.Payload),
+		Payload:      payload,
 		DeleteReason: n.DeleteReason,
 		Priority:     n.Priority,
 		State:        n.State,
@@ -498,16 +514,23 @@ func activityDTO(a db.Activity) ActivityDTO {
 		intent = i64s(*a.NodeID)
 	}
 	d := ActivityDTO{
-		Seq:              a.ID,
-		IntentID:         intent,
-		Worker:           a.Worker,
-		TS:               rfc3339(a.CreatedAt),
-		Kind:             a.Kind,
-		Tool:             a.Tool,
-		ToolUseID:        a.ToolUseID,
-		IsError:          a.IsError,
-		Summary:          a.Summary,
-		Detail:           a.Detail, // list endpoint leaves this empty (lazy)
+		Seq:       a.ID,
+		IntentID:  intent,
+		Worker:    a.Worker,
+		TS:        rfc3339(a.CreatedAt),
+		Kind:      a.Kind,
+		Tool:      a.Tool,
+		ToolUseID: a.ToolUseID,
+		IsError:   a.IsError,
+		// Server-generated summaries are stored language-neutrally and translated
+		// here, at the display boundary, so persisted history follows the current
+		// display language without ever rewriting a row. Model-authored text and
+		// tool output pass through unchanged (no catalog entry).
+		Summary: translateActivitySummary(a.Summary),
+		// A worker's terminal block ('result' row) is written in the original
+		// Chinese because the planner reads it back as agent input; translate the
+		// detail only on the way to the UI.
+		Detail:           translateActivityDetail(a.Kind, a.Detail), // list endpoint leaves this empty (lazy)
 		Metadata:         a.Metadata,
 		InputTokens:      a.InputTokens,
 		OutputTokens:     a.OutputTokens,
@@ -520,6 +543,22 @@ func activityDTO(a db.Activity) ActivityDTO {
 	}
 	d.Inherited = a.Inherited
 	return d
+}
+
+// translateActivityDetail translates the display detail of an activity row. Only
+// the agent's own terminal/capture blocks are translated; tool output, thinking
+// text, model answers and JSON payloads are returned untouched (see
+// agent.DisplayDetail, which only rewrites known framing lines).
+func translateActivityDetail(kind, detail string) string {
+	switch kind {
+	case "result":
+		return agent.DisplayDetail(detail)
+	case "llm_switch":
+		if detail != "" {
+			return translateActivitySummary(detail)
+		}
+	}
+	return detail
 }
 
 func activityDTOs(in []db.Activity) []ActivityDTO {

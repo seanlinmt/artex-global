@@ -14,8 +14,6 @@ package intercept
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,10 +23,12 @@ import (
 	"github.com/Autumn-27/artex/db"
 )
 
-// 사용자에게 노출되는 가로채기 판정·승인 메시지(한국어). judge 판정 결과·규칙 메시지는
-// 승인 기록(reason)·활동 스트림·409 응답으로 표시된다. 성능에 영향을 주는 에이전트 두뇌
-// (판정 프롬프트 본문)는 번역하지 않으며, [模型] 센티넬(decision_source 분류용 · UI 에서
-// 표시 전 제거 · db SQL LIKE·HasPrefix 소비처와 결합)도 원문 그대로 둔다.
+// 사용자에게 노출되는 가로채기 판정·승인 메시지(한국어 원문). judge 판정 결과·규칙
+// 메시지는 승인 기록(reason)·활동 스트림·409 응답으로 표시된다. 표시 전에
+// msg_i18n.go 의 trMsg/msgf/ruleMessage 를 거쳐 활성 표시 언어로 치환된다. 성능에
+// 영향을 주는 에이전트 두뇌(판정 프롬프트 본문)는 번역하지 않으며, [模型] 센티넬
+// (decision_source 분류용 · UI 에서 표시 전 제거 · db SQL LIKE·HasPrefix 소비처와
+// 결합)도 원문 그대로 둔다. 이 상수들을 직접 문자열로 조립하지 말고 위 헬퍼를 쓴다.
 const (
 	msgReviewContextIncomplete = "검토 맥락이 완전하지 않아 사람의 확인이 필요합니다: "
 	msgModelApprovalFailed     = "모델 승인에 실패하여 실패 정책에 따라 처리합니다: "
@@ -466,19 +466,19 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 	if contextErr != nil {
 		// Invalid current arguments cannot be reviewed faithfully, regardless of
 		// the configured model-failure strategy. A human must resolve the input.
-		out = Decision{Action: "ask", ModelFallback: true, Message: msgReviewContextIncomplete + contextErr.Error()}
+		out = Decision{Action: "ask", ModelFallback: true, Message: msgf(msgReviewContextIncomplete) + contextErr.Error()}
 	} else {
 		modelInput, _ = json.Marshal(input)
 		out, err = rv(cctx, cfg.ProfileID, cfg.Prompt, input)
 	}
 	if err != nil {
-		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: msgModelApprovalFailed + err.Error()}
+		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: msgf(msgModelApprovalFailed) + err.Error()}
 	}
 	switch out.Action {
 	case "allow", "ask", "deny":
 		// valid verdict
 	default:
-		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: msgModelOutputUnparsable}
+		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: trMsg(msgModelOutputUnparsable)}
 	}
 	// A model verdict never carries a rule; keep RuleID 0 (→ NULL) for history.
 	out.RuleID = 0
@@ -533,7 +533,7 @@ func (i *Interceptor) Match(toolName string, input []byte) (Decision, bool) {
 	if err != nil {
 		return Decision{
 			Action:  "ask",
-			Message: "拦截规则读取失败，按失败安全策略转人工确认：" + err.Error(),
+			Message: trMsg("拦截规则读取失败，按失败安全策略转人工确认：") + err.Error(),
 		}, true
 	}
 	if len(rules) == 0 {
@@ -577,14 +577,7 @@ func ruleMatches(r compiledRule, toolName string, input []byte) bool {
 }
 
 func defaultMessage(action, name string) string {
-	switch action {
-	case "deny":
-		return "가로채기 규칙 [" + name + "] 에 따라 이 도구를 실행할 수 없습니다"
-	case "ask":
-		return "가로채기 규칙 [" + name + "] 에 따라 사용자 승인이 필요합니다. 잠시 기다려 주세요"
-	default:
-		return ""
-	}
+	return ruleMessage(action, name)
 }
 
 // Log records an allow/deny rule or model decision into intercept_pending as an ALREADY-decided
@@ -638,7 +631,7 @@ func (i *Interceptor) HandleAsk(ctx context.Context, convID int64, dec Decision,
 	})
 	activity := db.Activity{
 		Kind:    "intercept_request",
-		Summary: fmt.Sprintf(msgToolApprovalRequestFmt, toolName, pendingID),
+		Summary: msgf(msgToolApprovalRequestFmt, toolName, pendingID),
 		Detail:  string(detail),
 	}
 
@@ -657,8 +650,8 @@ func (i *Interceptor) HandleAsk(ctx context.Context, convID int64, dec Decision,
 		case allowed := <-ch:
 			return allowed
 		case <-ctx.Done():
-			_, _ = i.db.ResolveIntercept(pendingID, "denied", "deny", reasonWorkCanceled)
-			_ = i.db.CompleteIntercept(pendingID, audit.RunID, audit.ToolUseID, "not_executed", reasonWorkCanceledPreExec, false)
+			_, _ = i.db.ResolveIntercept(pendingID, "denied", "deny", trMsg(reasonWorkCanceled))
+			_ = i.db.CompleteIntercept(pendingID, audit.RunID, audit.ToolUseID, "not_executed", trMsg(reasonWorkCanceledPreExec), false)
 			return false
 		}
 	}
@@ -678,7 +671,7 @@ func (i *Interceptor) HandleAsk(ctx context.Context, convID int64, dec Decision,
 		if allowed {
 			action = "allow"
 		}
-		resolved, err := i.db.ResolveIntercept(pendingID, "timeout", action, reasonApprovalTimeout)
+		resolved, err := i.db.ResolveIntercept(pendingID, "timeout", action, trMsg(reasonApprovalTimeout))
 		if err != nil {
 			return false
 		}
@@ -688,13 +681,13 @@ func (i *Interceptor) HandleAsk(ctx context.Context, convID int64, dec Decision,
 		}
 		return allowed
 	case <-ctx.Done():
-		_, _ = i.db.ResolveIntercept(pendingID, "denied", "deny", reasonWorkCanceled)
-		_ = i.db.CompleteIntercept(pendingID, audit.RunID, audit.ToolUseID, "not_executed", reasonWorkCanceledPreExec, false)
+		_, _ = i.db.ResolveIntercept(pendingID, "denied", "deny", trMsg(reasonWorkCanceled))
+		_ = i.db.CompleteIntercept(pendingID, audit.RunID, audit.ToolUseID, "not_executed", trMsg(reasonWorkCanceledPreExec), false)
 		return false
 	}
 }
 
-var ErrAlreadyDecided = errors.New("이미 처리되었거나 존재하지 않는 승인입니다. 기록을 새로 고쳐 주세요")
+var ErrAlreadyDecided = errs("이미 처리되었거나 존재하지 않는 승인입니다. 기록을 새로 고쳐 주세요")
 
 // Decide resolves a pending request. Called by the HTTP decide endpoint.
 func (i *Interceptor) Decide(pendingID int64, allowed bool) error {
@@ -702,9 +695,9 @@ func (i *Interceptor) Decide(pendingID int64, allowed bool) error {
 	if allowed {
 		status = "allowed"
 	}
-	action, reason := "deny", reasonManualDeny
+	action, reason := "deny", trMsg(reasonManualDeny)
 	if allowed {
-		action, reason = "allow", reasonManualAllow
+		action, reason = "allow", trMsg(reasonManualAllow)
 	}
 	resolved, err := i.db.ResolveIntercept(pendingID, status, action, reason)
 	if err != nil {
