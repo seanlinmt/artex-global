@@ -179,25 +179,33 @@ function toolInputText(tool: string, raw: string): string {
 }
 
 // InterceptCard renders an inline intercept_request approval card. The pending_id
-// is extracted from the summary (format: "도구 X 승인 요청 (#N)") so buttons are
-// available immediately without waiting for the detail load.
+// and tool name are read from the structured detail payload ({"pending_id":N,
+// "tool":"Bash"}), not parsed out of the summary prose: the summary is localized
+// server-side, so its wording differs per display language. The summary regex is
+// kept only as a fallback for rows written before that payload existed.
 function InterceptCard({ step, getDetail }: { step: Activity; getDetail: (seq: number) => Promise<string> }) {
   const t = useTranslations("transcript");
-  // extract pending_id from summary: "도구 Bash 승인 요청 (#42)"
-  const pendingId = React.useMemo(() => {
-    const m = /\(#(\d+)\)/.exec(step.summary);
-    return m ? parseInt(m[1], 10) : null;
-  }, [step.summary]);
-
-  const toolName = React.useMemo(() => {
-    const m = /도구\s+(\S+)\s+승인/.exec(step.summary);
-    return m ? m[1] : step.summary;
-  }, [step.summary]);
-
   const [detail, setDetail] = React.useState<Record<string, unknown> | null>(null);
   const [decided, setDecided] = React.useState<"allowed" | "denied" | "timeout" | null>(null);
   const [deciding, setDeciding] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
+
+  // pending_id: prefer the structured detail; fall back to "(#N)" in the summary.
+  const pendingId = React.useMemo(() => {
+    const fromDetail = detail?.pending_id;
+    if (typeof fromDetail === "number") return fromDetail;
+    const m = /\(#(\d+)\)/.exec(step.summary);
+    return m ? parseInt(m[1], 10) : null;
+  }, [detail, step.summary]);
+
+  // Tool name: prefer the structured detail. The Korean summary regex is a legacy
+  // fallback; if neither matches, the summary itself is the best label available.
+  const toolName = React.useMemo(() => {
+    const fromDetail = detail?.tool;
+    if (typeof fromDetail === "string" && fromDetail) return fromDetail;
+    const m = /도구\s+(\S+)\s+승인/.exec(step.summary);
+    return m ? m[1] : step.summary;
+  }, [detail, step.summary]);
   const [pending, setPending] = React.useState<InterceptPending | null>(null);
   const [statusError, setStatusError] = React.useState("");
   const [retry, setRetry] = React.useState(0);

@@ -4,6 +4,7 @@
 // are passed through and formatted at the call site.
 
 import type { ChatMention } from "@/lib/chat-mentions";
+import { clientMsg, clientMsgWithArg } from "@/lib/client-msg";
 import { MOCK } from "@/lib/mock/enabled";
 import { mockHandle } from "@/lib/mock/handler";
 import type {
@@ -140,7 +141,7 @@ export async function http<T>(path: string, init?: RequestInit): Promise<T> {
       document.cookie = "artex_token=; path=/; max-age=0";
       window.location.href = "/login";
     }
-    throw new Error("인증되지 않았습니다");
+    throw new Error(clientMsg("인증되지 않았습니다"));
   }
   if (!r.ok) {
     const fallback = `${init?.method ?? "GET"} ${path}: ${r.status}`;
@@ -466,19 +467,19 @@ export const api = {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: fd,
     });
-    if (!r.ok) throw new Error(`업로드 실패: ${r.status}`);
+    if (!r.ok) throw new Error(clientMsgWithArg("업로드 실패: ", r.status));
     return r.json() as Promise<{ uploaded: number }>;
   },
   workspaceDownload: async (path: string) => {
     let blob: Blob;
     if (MOCK) {
-      blob = new Blob([`(demo) ${path} 의 다운로드 내용 예시입니다.`], { type: "text/plain" });
+      blob = new Blob([`(demo) ${path}${clientMsg(" 의 다운로드 내용 예시입니다.")}`], { type: "text/plain" });
     } else {
       const token = getToken();
       const r = await fetch(`/api/workspace/download?path=${encodeURIComponent(path)}`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      if (!r.ok) throw new Error(`다운로드 실패: ${r.status}`);
+      if (!r.ok) throw new Error(clientMsgWithArg("다운로드 실패: ", r.status));
       blob = await r.blob();
     }
     const objUrl = URL.createObjectURL(blob);
@@ -667,8 +668,8 @@ export const api = {
       { headers: token ? { Authorization: `Bearer ${token}` } : {} },
     );
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "다운로드 실패" }));
-      throw new Error(error.error ?? "다운로드 실패");
+      const error = await response.json().catch(() => ({ error: clientMsg("다운로드 실패") }));
+      throw new Error(error.error ?? clientMsg("다운로드 실패"));
     }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -916,7 +917,7 @@ export const api = {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: fd,
     });
-    if (!r.ok) throw new Error(`업로드 실패: ${r.status} ${await r.text()}`);
+    if (!r.ok) throw new Error(clientMsgWithArg("업로드 실패: ", `${r.status} ${await r.text()}`));
     return r.json() as Promise<{ attachments: ChatAttachment[] }>;
   },
   stopChat: (taskId: string) => post<{ status: string }>(`/tasks/${taskId}/chat/stop`, {}),
@@ -1177,7 +1178,7 @@ export const api = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new ApiError(body?.error || `업로드 실패(${r.status})`, r.status);
+    if (!r.ok) throw new ApiError(body?.error || clientMsgWithArg("업로드 실패(", r.status, ")"), r.status);
     return body;
   },
   deleteSkill: (name: string) => del<{ deleted: string }>(`/skills/${name}`),
