@@ -69,6 +69,13 @@ func (s *Server) listFindingRetests(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	for i, item := range items {
+		if item.Error != "" {
+			cp := *item
+			cp.Error = translateActivitySummary(cp.Error)
+			items[i] = &cp
+		}
+	}
 	writeJSON(w, 200, map[string]any{"retests": items})
 }
 
@@ -118,7 +125,7 @@ func (s *Server) startFindingRetest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if t == nil || !t.Enabled || !slices.Contains(t.Agents, a.Key) {
-			writeErr(w, 409, errFindingRetestToolRequired+key)
+			writeErr(w, 409, trMsg(errFindingRetestToolRequired)+key)
 			return
 		}
 	}

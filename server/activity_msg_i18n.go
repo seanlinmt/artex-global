@@ -8,6 +8,7 @@ import (
 
 	"github.com/Autumn-27/artex/agent"
 	"github.com/Autumn-27/artex/config"
+	"github.com/Autumn-27/artex/sidequestion"
 )
 
 // activityMsgCatalog maps a server-generated activity summary (the exact Korean
@@ -117,6 +118,38 @@ var activityMsgCatalog = map[string]map[string]string{
 	"完成任务目标：": {"en": "Complete task goal: ", "ko": "작업 목표 달성: ", "es": "Completar objetivo de la tarea: ", "ja": "タスク目標を達成: "},
 	"（任务：":    {"en": " (Task: ", "ko": " (작업: ", "es": " (Tarea: ", "ja": "（タスク: "},
 	"）":      {"en": ")", "ko": ")", "es": ")", "ja": "）"},
+
+	// db/task_assets.go, db/tasks.go, db/schema.sql — task-asset provenance & scope summaries.
+	"의도가 앵커로 연결한 자산":  {"en": "Asset anchored by an intent", "zh": "由意图通过锚点关联的资产", "es": "Activo anclado por una intención", "ja": "インテントがアンカーで関連付けた資産"},
+	"작업 생성 시 연결된 회사":   {"en": "Company linked at task creation", "zh": "创建任务时关联的企业", "es": "Empresa vinculada al crear la tarea", "ja": "タスク作成時に関連付けられた企業"},
+	"작업 생성 시 연결된 회사: ": {"en": "Company linked at task creation: ", "zh": "创建任务时关联的企业：", "es": "Empresa vinculada al crear la tarea: ", "ja": "タスク作成時に関連付けられた企業: "},
+	"任务执行期间自动关联":      {"en": "Automatically linked during task execution", "ko": "작업 실행 중 자동 연결됨", "es": "Vinculado automáticamente durante la ejecución de la tarea", "ja": "タスク実行中に自動関連付け"},
+	"由历史任务资产关联迁移":     {"en": "Migrated from legacy task-asset link", "ko": "이전 작업-자산 연결에서 마이그레이션됨", "es": "Migrado de vínculos heredados entre tarea y activo", "ja": "従来のタスク・資産関連付けから移行"},
+
+	// server/conversations.go — finding retest failure reasons, default titles & trigger titles.
+	"재검증을 시작하지 못했습니다":              {"en": "Failed to start the retest", "zh": "无法启动复测", "es": "No se pudo iniciar la re-prueba", "ja": "再検証を開始できませんでした"},
+	"재검증 상태를 읽지 못했습니다. 다시 시작해 주세요": {"en": "Failed to read the retest status. Please start again", "zh": "无法读取复测状态，请重新开始", "es": "No se pudo leer el estado de la re-prueba. Iníciela de nuevo", "ja": "再検証の状態を読み取れませんでした。もう一度開始してください"},
+	"재검증이 중지되었거나 서비스가 종료되었습니다":     {"en": "The retest was stopped or the service shut down", "zh": "复测已停止或服务已关闭", "es": "La re-prueba se detuvo o el servicio se cerró", "ja": "再検証が停止されたか、サービスが終了しました"},
+	"请复测漏洞 #%d":                  {"en": "Please retest vulnerability #%d", "ko": "취약점 #%d 재검증을 수행해 주세요", "es": "Vuelva a probar la vulnerabilidad #%d", "ja": "脆弱性 #%d を再検証してください"},
+	"새 대화":                        {"en": "New conversation", "zh": "新对话", "es": "Nueva conversación", "ja": "新しい会話"},
+	"첨부 메시지":                      {"en": "Attachment message", "zh": "附件消息", "es": "Mensaje con adjuntos", "ja": "添付メッセージ"},
+	"未分类":                         {"en": "Uncategorized", "ko": "미분류", "es": "Sin categoría", "ja": "未分類"},
+	"复测 #%d · %s":                 {"en": "Retest #%d · %s", "ko": "재검증 #%d · %s", "es": "Re-prueba #%d · %s", "ja": "再検証 #%d · %s"},
+	"合并触发 · task#%d · %d 条":       {"en": "Batched triggers · task#%d · %d", "ko": "병합 트리거 · task#%d · %d건", "es": "Disparadores agrupados · task#%d · %d", "ja": "統合トリガー · task#%d · %d件"},
+	"合并触发 · 全部 · %d 条":            {"en": "Batched triggers · All · %d", "ko": "병합 트리거 · 전체 · %d건", "es": "Disparadores agrupados · Todo · %d", "ja": "統合トリガー · すべて · %d件"},
+	"超时触发 · task#%d":              {"en": "Timeout trigger · task#%d", "ko": "시간 초과 트리거 · task#%d", "es": "Disparador por tiempo agotado · task#%d", "ja": "タイムアウトトリガー · task#%d"},
+	"任务创建触发 · task#%d":            {"en": "Task-created trigger · task#%d", "ko": "작업 생성 트리거 · task#%d", "es": "Disparador al crear tarea · task#%d", "ja": "タスク作成トリガー · task#%d"},
+	"工具触发 · %s · task#%d":         {"en": "Tool trigger · %s · task#%d", "ko": "도구 트리거 · %s · task#%d", "es": "Disparador de herramienta · %s · task#%d", "ja": "ツールトリガー · %s · task#%d"},
+
+	// db/task_archives_restore.go — archive restore warnings surfaced via system activity detail.
+	"任务分类 %d 已删除，已恢复为未分类":     {"en": "Task category %d was deleted; restored as uncategorized", "ko": "작업 분류 %d 이(가) 삭제되어 미분류로 복원되었습니다", "es": "La categoría de tarea %d fue eliminada; se restauró sin categoría", "ja": "タスク分類 %d は削除されていたため未分類として復元されました"},
+	"任务企业 %d 已删除，企业关联已跳过":     {"en": "Task company %d was deleted; company link skipped", "ko": "작업 기업 %d 이(가) 삭제되어 기업 연결을 건너뛰었습니다", "es": "La empresa %d de la tarea fue eliminada; se omitió el vínculo", "ja": "タスク企業 %d は削除されていたため企業の関連付けをスキップしました"},
+	"LLM 配置 %d 已删除，已从任务配置中移除": {"en": "LLM configuration %d was deleted; removed from task configuration", "ko": "LLM 설정 %d 이(가) 삭제되어 작업 설정에서 제거되었습니다", "es": "La configuración de LLM %d fue eliminada; se quitó de la tarea", "ja": "LLM 設定 %d は削除されていたためタスク設定から除外されました"},
+	"资产 %d 的企业 %d 已删除，已恢复为未归属": {"en": "Asset %d: company %d was deleted; restored as unassigned", "ko": "자산 %d 의 기업 %d 이(가) 삭제되어 미귀속으로 복원되었습니다", "es": "Activo %d: la empresa %d fue eliminada; se restauró sin asignar", "ja": "資産 %d の企業 %d は削除されていたため未帰属として復元されました"},
+	"资产 ID %d 已被占用，恢复为 %d":    {"en": "Asset ID %d was already taken; restored as %d", "ko": "자산 ID %d 이(가) 이미 사용 중이어서 %d (으)로 복원되었습니다", "es": "El ID de activo %d ya estaba ocupado; se restauró como %d", "ja": "資産 ID %d は既に使用されていたため %d として復元されました"},
+	"来源任务 %d 不可用，继承关系已跳过":     {"en": "Source task %d is unavailable; inheritance link skipped", "ko": "출처 작업 %d 을(를) 사용할 수 없어 상속 관계를 건너뛰었습니다", "es": "La tarea de origen %d no está disponible; se omitió la herencia", "ja": "元のタスク %d は利用できないため継承関係をスキップしました"},
+	"企业 %d 已删除，关联范围已跳过":       {"en": "Company %d was deleted; linked scope skipped", "ko": "기업 %d 이(가) 삭제되어 연결 범위를 건너뛰었습니다", "es": "La empresa %d fue eliminada; se omitió el alcance vinculado", "ja": "企業 %d は削除されていたため関連範囲をスキップしました"},
+	"LLM 配置 %d 已删除，配置链项已跳过":   {"en": "LLM configuration %d was deleted; configuration chain entry skipped", "ko": "LLM 설정 %d 이(가) 삭제되어 설정 체인 항목을 건너뛰었습니다", "es": "La configuración de LLM %d fue eliminada; se omitió la entrada de la cadena", "ja": "LLM 設定 %d は削除されていたため設定チェーン項目をスキップしました"},
 }
 
 // activityMsg translates one stored activity summary into the active output
@@ -274,6 +307,14 @@ var activitySummaryPatterns = []activitySummaryPattern{
 		}
 		return "(" + activityMsg("오류: ") + m[1] + ")", true
 	}},
+	// db/tasks.go task_asset_links.source_summary with appended company name.
+	{pattern: regexp.MustCompile(`^작업 생성 시 연결된 회사: ([\s\S]*)$`), render: func(m []string) (string, bool) {
+		return translatePrefix("작업 생성 시 연결된 회사: ", m[1])
+	}},
+	// db/finding_retests.go initial user message summary "请复测漏洞 #%d".
+	{pattern: regexp.MustCompile(`^请复测漏洞 #(\d+)$`), render: func(m []string) (string, bool) {
+		return fillTemplate("请复测漏洞 #%d", mustInt(m[1]))
+	}},
 }
 
 var (
@@ -344,4 +385,155 @@ func joinFragments(prefix, middle, suffix string) (string, bool) {
 		return "", false
 	}
 	return pre + middle + suf, true
+}
+
+var (
+	reConvRetestTitle        = regexp.MustCompile(`^复测 #(\d+) · ([\s\S]+)$`)
+	reConvMergeTaskTitle     = regexp.MustCompile(`^合并触发 · task#(\d+) · (\d+) 条$`)
+	reConvMergeAllTitle      = regexp.MustCompile(`^合并触发 · 全部 · (\d+) 条$`)
+	reConvTimeoutTrigger     = regexp.MustCompile(`^超时触发 · task#(\d+)$`)
+	reConvTaskCreateTrigger  = regexp.MustCompile(`^任务创建触发 · task#(\d+)$`)
+	reConvToolCallTrigger    = regexp.MustCompile(`^工具触发 · (.+?) · task#(\d+)$`)
+	archiveRestoreWarnRules = []activitySummaryPattern{
+		{pattern: regexp.MustCompile(`^任务分类 (\d+) 已删除，已恢复为未分类$`), render: func(m []string) (string, bool) {
+			return fillTemplate("任务分类 %d 已删除，已恢复为未分类", mustInt(m[1]))
+		}},
+		{pattern: regexp.MustCompile(`^任务企业 (\d+) 已删除，企业关联已跳过$`), render: func(m []string) (string, bool) {
+			return fillTemplate("任务企业 %d 已删除，企业关联已跳过", mustInt(m[1]))
+		}},
+		{pattern: regexp.MustCompile(`^LLM 配置 (\d+) 已删除，已从任务配置中移除$`), render: func(m []string) (string, bool) {
+			return fillTemplate("LLM 配置 %d 已删除，已从任务配置中移除", mustInt(m[1]))
+		}},
+		{pattern: regexp.MustCompile(`^资产 (\d+) 的企业 (\d+) 已删除，已恢复为未归属$`), render: func(m []string) (string, bool) {
+			return fillTemplate("资产 %d 的企业 %d 已删除，已恢复为未归属", mustInt(m[1]), mustInt(m[2]))
+		}},
+		{pattern: regexp.MustCompile(`^资产 ID (\d+) 已被占用，恢复为 (\d+)$`), render: func(m []string) (string, bool) {
+			return fillTemplate("资产 ID %d 已被占用，恢复为 %d", mustInt(m[1]), mustInt(m[2]))
+		}},
+		{pattern: regexp.MustCompile(`^来源任务 (\d+) 不可用，继承关系已跳过$`), render: func(m []string) (string, bool) {
+			return fillTemplate("来源任务 %d 不可用，继承关系已跳过", mustInt(m[1]))
+		}},
+		{pattern: regexp.MustCompile(`^企业 (\d+) 已删除，关联范围已跳过$`), render: func(m []string) (string, bool) {
+			return fillTemplate("企业 %d 已删除，关联范围已跳过", mustInt(m[1]))
+		}},
+		{pattern: regexp.MustCompile(`^LLM 配置 (\d+) 已删除，配置链项已跳过$`), render: func(m []string) (string, bool) {
+			return fillTemplate("LLM 配置 %d 已删除，配置链项已跳过", mustInt(m[1]))
+		}},
+	}
+)
+
+// translateConversationTitle translates system-generated conversation titles at
+// the API boundary without touching persisted rows or the "새 대화" sentinel.
+func translateConversationTitle(title string) string {
+	if title == "" {
+		return title
+	}
+	if out := activityMsg(title); out != title {
+		return out
+	}
+	if config.ActiveLanguage() == "zh" {
+		return title
+	}
+	if m := reConvRetestTitle.FindStringSubmatch(title); m != nil {
+		suffix := m[2]
+		if suffix == "未分类" {
+			suffix = activityMsg("未分类")
+		}
+		if out, ok := fillTemplate("复测 #%d · %s", mustInt(m[1]), suffix); ok {
+			return out
+		}
+	}
+	for _, r := range []activitySummaryPattern{
+		{pattern: reConvMergeTaskTitle, render: func(m []string) (string, bool) {
+			return fillTemplate("合并触发 · task#%d · %d 条", mustInt(m[1]), mustInt(m[2]))
+		}},
+		{pattern: reConvMergeAllTitle, render: func(m []string) (string, bool) {
+			return fillTemplate("合并触发 · 全部 · %d 条", mustInt(m[1]))
+		}},
+		{pattern: reConvTimeoutTrigger, render: func(m []string) (string, bool) {
+			return fillTemplate("超时触发 · task#%d", mustInt(m[1]))
+		}},
+		{pattern: reConvTaskCreateTrigger, render: func(m []string) (string, bool) {
+			return fillTemplate("任务创建触发 · task#%d", mustInt(m[1]))
+		}},
+		{pattern: reConvToolCallTrigger, render: func(m []string) (string, bool) {
+			return fillTemplate("工具触发 · %s · task#%d", m[1], mustInt(m[2]))
+		}},
+	} {
+		if m := r.pattern.FindStringSubmatch(title); m != nil {
+			if out, ok := r.render(m); ok {
+				return out
+			}
+		}
+	}
+	return title
+}
+
+// translateArchiveWarnings translates persisted task-archive restore warnings
+// line-by-line at read time while leaving unknown text untouched.
+func translateArchiveWarnings(detail string) string {
+	if detail == "" || config.ActiveLanguage() == "zh" {
+		return detail
+	}
+	lines := strings.Split(detail, "\n")
+	changed := false
+	for i, line := range lines {
+		for _, r := range archiveRestoreWarnRules {
+			if m := r.pattern.FindStringSubmatch(line); m != nil {
+				if out, ok := r.render(m); ok && out != line {
+					lines[i] = out
+					changed = true
+				}
+				break
+			}
+		}
+	}
+	if !changed {
+		return detail
+	}
+	return strings.Join(lines, "\n")
+}
+
+// translateLazyActivityDetail translates lazy-loaded activity detail blobs for
+// terminal blocks, archive restore warnings, and known server detail lines.
+func translateLazyActivityDetail(detail string) string {
+	if detail == "" {
+		return detail
+	}
+	if out := agent.DisplayDetail(detail); out != detail {
+		return out
+	}
+	if out := translateArchiveWarnings(detail); out != detail {
+		return out
+	}
+	return translateActivitySummary(detail)
+}
+
+// translateSideQuestionError translates both Korean (server/sidequestion) and
+// Chinese (db/side_questions) user-facing side-question errors at the API boundary.
+func translateSideQuestionError(s string) string {
+	if s == "" {
+		return s
+	}
+	if out := trMsg(s); out != s {
+		return out
+	}
+	const sideSummaryErrPrefix = "곁질문 요약에 실패했습니다: "
+	if strings.HasPrefix(s, sideSummaryErrPrefix) {
+		if trPre := trMsg(sideSummaryErrPrefix); trPre != sideSummaryErrPrefix {
+			return trPre + strings.TrimPrefix(s, sideSummaryErrPrefix)
+		}
+	}
+	return config.TrMsg(s)
+}
+
+// translateSideExchange returns a display copy of a side-question exchange with
+// its error and tool-unavailable notice translated to the active output language.
+func translateSideExchange(e sidequestion.Exchange) sidequestion.Exchange {
+	e.Error = translateSideQuestionError(e.Error)
+	const sideToolUnavailable = "현재 곁질문에서는 도구 작업을 실행할 수 없습니다. 작업 요청은 메인 대화에서 보내 주세요."
+	if e.Answer == sideToolUnavailable {
+		e.Answer = trMsg(sideToolUnavailable)
+	}
+	return e
 }

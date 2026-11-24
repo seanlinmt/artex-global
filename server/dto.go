@@ -557,6 +557,8 @@ func translateActivityDetail(kind, detail string) string {
 		if detail != "" {
 			return translateActivitySummary(detail)
 		}
+	case "system":
+		return translateArchiveWarnings(detail)
 	}
 	return detail
 }

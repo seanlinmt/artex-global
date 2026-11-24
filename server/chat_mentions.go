@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/Autumn-27/artex/config"
 	"github.com/Autumn-27/artex/db"
 )
 
@@ -91,7 +92,7 @@ func (s *Server) searchChatMentions(w http.ResponseWriter, r *http.Request) {
 	page, err := pg.SearchChatMentionsPage(r.Context(), kind, query, r.URL.Query().Get("cursor"))
 	if err != nil {
 		if errors.Is(err, db.ErrInvalidChatMentionCursor) {
-			writeErr(w, 400, err.Error())
+			writeErr(w, 400, config.TrMsg(err.Error()))
 			return
 		}
 		writeErr(w, 500, err.Error())
@@ -134,10 +135,12 @@ func composeChatMentionMessage(pg *db.DB, message string) (string, error) {
 			return "", err
 		}
 		if data == nil {
-			// 와이어 라벨(ref.Name, 중국어)은 보존하되, 표시는 한국어 라벨로.
+			// 와이어 라벨(ref.Name, 중국어)은 보존하되, 표시는 활성 출력 언어로 치환한다.
 			label := chatMentionKindLabel[ref.Kind]
 			if label == "" {
 				label = ref.Name
+			} else {
+				label = trMsg(label)
 			}
 			return "", &chatMentionInputError{fmt.Sprintf(trMsg(errChatMentionNotFoundFmt), label, ref.ID)}
 		}

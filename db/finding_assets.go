@@ -2,10 +2,13 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Autumn-27/artex/config"
 )
 
 // ---------------------------------------------------------------------------
@@ -182,7 +185,7 @@ FROM findings f LEFT JOIN tasks t ON f.task_id = t.id`+where, args...)
 
 	// 计数:一条发现沿它每个资产的祖先链向上,收集去重后的 key 集合再逐个 +1,
 	// 所以父节点不会因为一条发现挂了多个子资产而重复计数。
-	unassigned := &FindingAssetNode{Key: FindingUnassignedAsset, Kind: "none", Label: "未关联资产"}
+	unassigned := &FindingAssetNode{Key: FindingUnassignedAsset, Kind: "none", Label: config.TrMsg("未关联资产")}
 	touched := map[string]bool{}
 	for _, h := range hits {
 		clear(touched)
@@ -556,7 +559,7 @@ func (d *DB) attachCompanyNodes(nodes map[string]*FindingAssetNode, parentOf map
 			continue
 		}
 		if name == "" {
-			name = "企业 #" + strconv.FormatInt(id, 10)
+			name = fmt.Sprintf(config.TrMsg("企业 #%d"), id)
 		}
 		nodes[key] = &FindingAssetNode{Key: key, Kind: "company", Label: name, CompanyID: id}
 	}

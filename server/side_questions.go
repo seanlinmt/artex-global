@@ -349,9 +349,16 @@ func (s *Server) handleSideQuestions(w http.ResponseWriter, r *http.Request, p s
 			_, modelErr := s.sideProvider(snap.Model)
 			reason := ""
 			if modelErr != nil {
-				reason = modelErr.Error()
+				reason = translateSideQuestionError(modelErr.Error())
 			}
 			meta = map[string]any{"captured_at": snap.CapturedAt, "model": snap.Model, "available": modelErr == nil, "reason": reason}
+		}
+		for i := range items {
+			items[i] = translateSideExchange(items[i])
+		}
+		if current != nil {
+			cp := translateSideExchange(*current)
+			current = &cp
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "current": current, "next_cursor": next, "snapshot": meta})
 		return
@@ -384,7 +391,8 @@ func (s *Server) handleSideQuestions(w http.ResponseWriter, r *http.Request, p s
 			writeErr(w, 409, sideErrRequestIDReused)
 			return
 		}
-		writeJSON(w, 200, existing)
+		cp := translateSideExchange(*existing)
+		writeJSON(w, 200, &cp)
 		return
 	}
 	if snap == nil {
@@ -406,7 +414,7 @@ func (s *Server) handleSideQuestions(w http.ResponseWriter, r *http.Request, p s
 	}
 	s.side.mu.Unlock()
 	if busy {
-		writeErr(w, 409, db.ErrSideBusy.Error())
+		writeErr(w, 409, translateSideQuestionError(db.ErrSideBusy.Error()))
 		return
 	}
 	if full {
@@ -423,7 +431,7 @@ func (s *Server) handleSideQuestions(w http.ResponseWriter, r *http.Request, p s
 	}
 	e, created, err := s.m.pg.StartSideRequest(r.Context(), *snap, in.ClientID, in.Question)
 	if err != nil {
-		writeErr(w, 409, err.Error())
+		writeErr(w, 409, translateSideQuestionError(err.Error()))
 		return
 	}
 	if created {
@@ -433,7 +441,8 @@ func (s *Server) handleSideQuestions(w http.ResponseWriter, r *http.Request, p s
 		s.side.mu.Unlock()
 		go s.runSide(ctx, cancel, *e, p, provider, *snap, agentQuestion)
 	}
-	writeJSON(w, 202, e)
+	cp := translateSideExchange(*e)
+	writeJSON(w, 202, &cp)
 }
 
 func (s *Server) runSide(ctx context.Context, cancel context.CancelFunc, e sidequestion.Exchange, parent sidequestion.Parent, provider llm.Provider, snapshot sidequestion.Snapshot, agentQuestion string) {
@@ -582,7 +591,8 @@ func (s *Server) sideEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if e.Sequence > seq {
-			b, _ := json.Marshal(e)
+			cp := translateSideExchange(*e)
+			b, _ := json.Marshal(&cp)
 			fmt.Fprintf(w, "id: %d\nevent: snapshot\ndata: %s\n\n", e.Sequence, b)
 			flusher.Flush()
 			seq = e.Sequence

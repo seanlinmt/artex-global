@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Autumn-27/artex/config"
 )
 
 // ChatMention is a lightweight search result. Details are read again on send.
@@ -52,7 +54,7 @@ func (d *DB) SearchChatMentions(ctx context.Context, kind, query string) ([]Chat
 func (d *DB) SearchChatMentionsPage(ctx context.Context, kind, query, cursor string) (ChatMentionPage, error) {
 	page := ChatMentionPage{Items: make([]ChatMention, 0)}
 	if kind != "" && !ValidChatMentionKind(kind) {
-		return page, fmt.Errorf("不支持的引用类型")
+		return page, errors.New(config.TrMsg("不支持的引用类型"))
 	}
 	var after chatMentionCursor
 	if cursor != "" {
@@ -82,13 +84,13 @@ SELECT kind, id, left(label, 160), left(description, 240) FROM (
  UNION ALL
  (SELECT type, id,
     CASE WHEN type='endpoint' THEN concat_ws(' ',NULLIF(method,''),url)
-         ELSE COALESCE(NULLIF(app_name,''),NULLIF(url,''),NULLIF(domain,''),NULLIF(ip,''),NULLIF(bundle_id,''),'资产 #'||id::text) END,
+         ELSE COALESCE(NULLIF(app_name,''),NULLIF(url,''),NULLIF(domain,''),NULLIF(ip,''),NULLIF(bundle_id,''),$7||id::text) END,
     concat_ws(' · ',type,NULLIF(page_title,''),NULLIF(service_name,''),NULLIF(bundle_id,''),NULLIF(ip,''),port::text)
   FROM assets WHERE ($1='' OR $1='asset' OR type=$1) AND
     ($2='' OR id::text=$2 OR concat_ws(' ',domain,root_domain,ip,url,app_name,bundle_id,page_title,service_name,method) ILIKE $3)
     AND ($4::bigint=0 OR (id::text=$2)<$6 OR ((id::text=$2)=$6 AND (id<$4 OR (id=$4 AND type>$5))))
   ORDER BY (id::text=$2) DESC, id DESC LIMIT 21)
-) matches ORDER BY (id::text=$2) DESC, id DESC, kind LIMIT 21`, kind, query, pattern, after.ID, after.Kind, after.Exact)
+) matches ORDER BY (id::text=$2) DESC, id DESC, kind LIMIT 21`, kind, query, pattern, after.ID, after.Kind, after.Exact, config.TrMsg("资产 #"))
 	if err != nil {
 		return page, err
 	}

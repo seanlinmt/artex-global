@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"unicode"
@@ -9,6 +11,7 @@ import (
 	"github.com/Autumn-27/artex/agent"
 	"github.com/Autumn-27/artex/config"
 	"github.com/Autumn-27/artex/db"
+	"github.com/Autumn-27/artex/sidequestion"
 )
 
 func TestActivityDTOTranslatesTerminalSummary(t *testing.T) {
@@ -265,5 +268,217 @@ func TestActivityDTOTranslatesLLMSwitchAndNumericPatterns(t *testing.T) {
 	}).Summary
 	if want := "Reading the interception rules failed; falling back to human confirmation (fail-safe): permission denied"; interceptErr != want {
 		t.Fatalf("intercept err summary = %q, want %q", interceptErr, want)
+	}
+}
+
+func containsCJK(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hangul, r) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestActivityMsgCatalogFormatVerbsMatch(t *testing.T) {
+	verbs := regexp.MustCompile(`%[-+# 0-9.]*[a-zA-Z%]`)
+	for src, tr := range activityMsgCatalog {
+		want := strings.Join(verbs.FindAllString(src, -1), " ")
+		for lang, v := range tr {
+			if got := strings.Join(verbs.FindAllString(v, -1), " "); got != want {
+				t.Errorf("activityMsgCatalog[%q][%s] verbs = %q, want %q", src, lang, got, want)
+			}
+		}
+	}
+}
+
+func TestLowerLayerLabelsAndDSLErrorsInEnglish(t *testing.T) {
+	t.Cleanup(func() { config.CurrentLanguage = nil })
+	config.CurrentLanguage = func() string { return "en" }
+
+	if got, want := config.TrMsg("未关联资产"), "Unlinked assets"; got != want {
+		t.Fatalf("TrMsg(unlinked) = %q, want %q", got, want)
+	}
+	if got, want := fmt.Sprintf(config.TrMsg("企业 #%d"), 42), "Company #42"; got != want {
+		t.Fatalf("company fallback = %q, want %q", got, want)
+	}
+	if got, want := config.TrMsg("资产 #"), "Asset #"; got != want {
+		t.Fatalf("asset mention fallback = %q, want %q", got, want)
+	}
+	if got, want := config.TrMsg(db.ErrInvalidChatMentionCursor.Error()), "Invalid pagination cursor; please search again"; got != want {
+		t.Fatalf("mention cursor err = %q, want %q", got, want)
+	}
+
+	for _, badDSL := range []string{
+		"(domain=example.com",
+		"domain AND",
+		")",
+		"domain=a b",
+		"task_id=abc",
+		"company_id=xyz",
+		"port=abc",
+		"technologies>foo",
+		"domain>foo",
+		"(domain=example.com) extra",
+	} {
+		err := db.ValidateDSL(badDSL)
+		if err == nil {
+			t.Fatalf("expected error for invalid DSL %q", badDSL)
+		}
+		if containsCJK(err.Error()) {
+			t.Fatalf("DSL error for %q contains CJK: %q", badDSL, err.Error())
+		}
+	}
+}
+
+func TestProvenanceAndRetestSummariesInEnglish(t *testing.T) {
+	t.Cleanup(func() { config.CurrentLanguage = nil })
+	config.CurrentLanguage = func() string { return "en" }
+
+	for _, src := range []string{
+		"자산 API 로 등록",
+		"작업 설명 또는 목표로 초기화",
+		"사용자가 테스트 자산 페이지에서 직접 추가",
+		"의도가 앵커로 연결한 자산",
+		"작업 생성 시 연결된 회사",
+		"작업 생성 시 연결된 회사: Clear Pixels",
+		"任务执行期间自动关联",
+		"由历史任务资产关联迁移",
+	} {
+		got := translateActivitySummary(src)
+		if got == src || containsCJK(got) {
+			t.Fatalf("provenance/scope %q -> %q", src, got)
+		}
+	}
+	if got, want := translateActivitySummary("작업 생성 시 연결된 회사: Clear Pixels"), "Company linked at task creation: Clear Pixels"; got != want {
+		t.Fatalf("company scope reason = %q, want %q", got, want)
+	}
+
+	for _, reason := range []string{
+		"서비스가 재시작되어 재검증이 중단되었습니다. 다시 시작해 주세요",
+		"에이전트가 재검증 결론을 저장하지 않았습니다. 대화를 확인한 뒤 다시 재검증해 주세요",
+		convRetestFailedToStart,
+		convRetestStatusReadFailed,
+		convRetestStoppedOrClosed,
+		"请复测漏洞 #7",
+	} {
+		got := translateActivitySummary(reason)
+		if got == reason || containsCJK(got) {
+			t.Fatalf("retest msg %q -> %q", reason, got)
+		}
+	}
+}
+
+func TestConversationTitlesAndArchiveWarnings(t *testing.T) {
+	t.Cleanup(func() { config.CurrentLanguage = nil })
+	config.CurrentLanguage = func() string { return "en" }
+
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"새 대화", "New conversation"},
+		{"첨부 메시지", "Attachment message"},
+		{"复测 #7 · 未分类", "Retest #7 · Uncategorized"},
+		{"复测 #7 · Reflected XSS", "Retest #7 · Reflected XSS"},
+		{"合并触发 · task#12 · 3 条", "Batched triggers · task#12 · 3"},
+		{"合并触发 · 全部 · 5 条", "Batched triggers · All · 5"},
+		{"超时触发 · task#9", "Timeout trigger · task#9"},
+		{"任务创建触发 · task#4", "Task-created trigger · task#4"},
+		{"工具触发 · Bash · task#8", "Tool trigger · Bash · task#8"},
+		{"My custom title", "My custom title"},
+	}
+	for _, tc := range cases {
+		if got := translateConversationTitle(tc.in); got != tc.want {
+			t.Errorf("translateConversationTitle(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+
+	// Pass-through checks for Korean sentinel and Chinese titles.
+	config.CurrentLanguage = func() string { return "ko" }
+	if got := translateConversationTitle("새 대화"); got != "새 대화" {
+		t.Fatalf("ko default title = %q, want %q", got, "새 대화")
+	}
+	config.CurrentLanguage = func() string { return "zh" }
+	if got := translateConversationTitle("复测 #7 · 未分类"); got != "复测 #7 · 未分类" {
+		t.Fatalf("zh retest title = %q, want unchanged", got)
+	}
+
+	config.CurrentLanguage = func() string { return "en" }
+	warnings := strings.Join([]string{
+		"任务分类 1 已删除，已恢复为未分类",
+		"任务企业 2 已删除，企业关联已跳过",
+		"LLM 配置 3 已删除，已从任务配置中移除",
+		"资产 4 的企业 5 已删除，已恢复为未归属",
+		"资产 ID 6 已被占用，恢复为 7",
+		"来源任务 8 不可用，继承关系已跳过",
+		"企业 9 已删除，关联范围已跳过",
+		"LLM 配置 10 已删除，配置链项已跳过",
+	}, "\n")
+	gotWarn := translateActivityDetail("system", warnings)
+	if containsCJK(gotWarn) {
+		t.Fatalf("archive warnings still contain CJK:\n%s", gotWarn)
+	}
+	if !strings.Contains(gotWarn, "Asset 4: company 5 was deleted") || !strings.Contains(gotWarn, "Asset ID 6 was already taken; restored as 7") {
+		t.Fatalf("unexpected archive warnings output:\n%s", gotWarn)
+	}
+	if gotLazy := translateLazyActivityDetail(warnings); gotLazy != gotWarn {
+		t.Fatalf("translateLazyActivityDetail mismatch:\n%s\nvs\n%s", gotLazy, gotWarn)
+	}
+
+	config.CurrentLanguage = func() string { return "zh" }
+	if unchanged := translateActivityDetail("system", warnings); unchanged != warnings {
+		t.Fatalf("zh archive warnings should stay unchanged, got:\n%s", unchanged)
+	}
+}
+
+func TestResolutionSideQuestionAndGlobalVarsInEnglish(t *testing.T) {
+	t.Cleanup(func() { config.CurrentLanguage = nil })
+	config.CurrentLanguage = func() string { return "en" }
+
+	s := &Server{}
+	missing := s.resolutionFromProfile(nil, "task_chain")
+	if missing.Reason == "" || containsCJK(missing.Reason) {
+		t.Fatalf("resolutionFromProfile(nil).Reason = %q", missing.Reason)
+	}
+	noKey := s.resolutionFromProfile(&db.LLMProfile{Name: "p", Format: "openai", Model: "m"}, "task_chain")
+	if noKey.Reason == "" || containsCJK(noKey.Reason) {
+		t.Fatalf("resolutionFromProfile(noKey).Reason = %q", noKey.Reason)
+	}
+	if got := trMsg(sourceNameGlobalConfig); got == sourceNameGlobalConfig || containsCJK(got) {
+		t.Fatalf("trMsg(sourceNameGlobalConfig) = %q", got)
+	}
+
+	for _, errMsg := range []string{
+		sideErrCtxNotSaved,
+		sideErrModelConfigChanged,
+		sideErrAnswerTimeout,
+		"곁질문 요약에 실패했습니다: context deadline exceeded",
+		db.ErrSideBusy.Error(),
+		db.ErrSideParentGone.Error(),
+		"同一请求 ID 不能用于不同问题",
+		"服务重启，回答已中断",
+	} {
+		got := translateSideQuestionError(errMsg)
+		if got == errMsg || containsCJK(got) {
+			t.Fatalf("translateSideQuestionError(%q) = %q", errMsg, got)
+		}
+	}
+	ex := translateSideExchange(sidequestion.Exchange{
+		Error:  "服务重启，回答已中断",
+		Answer: "현재 곁질문에서는 도구 작업을 실행할 수 없습니다. 작업 요청은 메인 대화에서 보내 주세요.",
+	})
+	if containsCJK(ex.Error) || containsCJK(ex.Answer) || !strings.Contains(ex.Answer, "Tools cannot run") {
+		t.Fatalf("translateSideExchange = %+v", ex)
+	}
+
+	vars := withGlobalVars(nil)
+	if len(vars) == 0 {
+		t.Fatal("withGlobalVars returned empty slice")
+	}
+	for _, v := range vars {
+		if containsCJK(v.Description) {
+			t.Fatalf("global var %s still contains CJK: %q", v.Name, v.Description)
+		}
 	}
 }

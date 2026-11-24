@@ -111,5 +111,10 @@ func (s *Server) taskIntentAssets(w http.ResponseWriter, r *http.Request) {
 		writeTaskAssetError(w, err)
 		return
 	}
+	for i := range assets {
+		if assets[i].SourceSummary != "" {
+			assets[i].SourceSummary = translateActivitySummary(assets[i].SourceSummary)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"assets": assets})
 }

@@ -2209,7 +2209,11 @@ func withGlobalVars(vars []db.PromptVar) []db.PromptVar {
 		}
 		out = append(out, v)
 	}
-	return append(out, globalPromptVars...)
+	for _, g := range globalPromptVars {
+		g.Description = trMsg(g.Description)
+		out = append(out, g)
+	}
+	return out
 }
 
 // validateTemplate parses the template and rejects any {{.Var}} not in the catalog.

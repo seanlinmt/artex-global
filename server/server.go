@@ -1949,6 +1949,11 @@ func (s *Server) taskScopeList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	for i := range rows {
+		if rows[i].Reason != "" {
+			rows[i].Reason = translateActivitySummary(rows[i].Reason)
+		}
+	}
 	writeJSON(w, 200, map[string]any{"scope": rows})
 }
 
@@ -3197,7 +3202,7 @@ func (s *Server) activityDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]any{"detail": agent.DisplayDetail(d)})
+	writeJSON(w, 200, map[string]any{"detail": translateLazyActivityDetail(d)})
 }
 
 // taskActivityDetail keeps the legacy local-task behavior (including thinking

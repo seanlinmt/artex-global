@@ -74,6 +74,27 @@ var zhMsgCatalog = map[string]map[string]string{
 	"流量 %s: %w": {"en": "Traffic %s: %w", "ko": "트래픽 %s: %w", "es": "Tráfico %s: %w", "ja": "トラフィック %s: %w"},
 	"旧流量路径无效":   {"en": "Invalid legacy traffic path", "ko": "이전 트래픽 경로가 유효하지 않습니다", "es": "Ruta de tráfico heredada no válida", "ja": "旧トラフィックパスが無効です"},
 	"旧流量报文头过大":  {"en": "Legacy traffic header is too large", "ko": "이전 트래픽 헤더가 너무 큽니다", "es": "La cabecera del tráfico heredado es demasiado grande", "ja": "旧トラフィックのヘッダーが大きすぎます"},
+
+	"未关联资产":          {"en": "Unlinked assets", "ko": "미연결 자산", "es": "Activos sin vincular", "ja": "未紐付け資産"},
+	"企业 #%d":         {"en": "Company #%d", "ko": "기업 #%d", "es": "Empresa #%d", "ja": "企業 #%d"},
+	"资产 #":           {"en": "Asset #", "ko": "자산 #", "es": "Activo #", "ja": "資産 #"},
+	"分页位置无效，请重新搜索":   {"en": "Invalid pagination cursor; please search again", "ko": "페이지 위치가 유효하지 않습니다. 다시 검색해 주세요", "es": "Cursor de paginación no válido; vuelva a buscar", "ja": "ページ位置が無効です。もう一度検索してください"},
+	"不支持的引用类型":       {"en": "Unsupported mention type", "ko": "지원하지 않는 인용 유형입니다", "es": "Tipo de mención no admitido", "ja": "サポートされていない参照タイプです"},
+	"DSL 语法错误：缺少右括号 ')'":    {"en": "DSL syntax error: missing closing parenthesis ')'", "ko": "DSL 구문 오류: 닫는 괄호 ')'가 없습니다", "es": "Error de sintaxis DSL: falta el paréntesis de cierre ')'", "ja": "DSL 構文エラー: 閉じ括弧 ')' がありません"},
+	"DSL 语法错误：表达式不完整":       {"en": "DSL syntax error: incomplete expression", "ko": "DSL 구문 오류: 식이 완전하지 않습니다", "es": "Error de sintaxis DSL: expresión incompleta", "ja": "DSL 構文エラー: 式が不完全です"},
+	"DSL 语法错误：意外的 token '%s'": {"en": "DSL syntax error: unexpected token '%s'", "ko": "DSL 구문 오류: 예기치 않은 토큰 '%s'", "es": "Error de sintaxis DSL: token inesperado '%s'", "ja": "DSL 構文エラー: 予期しないトークン '%s'"},
+	"DSL 语法错误：意外的内容 '%s'":    {"en": "DSL syntax error: unexpected content '%s'", "ko": "DSL 구문 오류: 예기치 않은 내용 '%s'", "es": "Error de sintaxis DSL: contenido inesperado '%s'", "ja": "DSL 構文エラー: 予期しない内容 '%s'"},
+	"task_id 需要整数值: %s":     {"en": "task_id requires an integer value: %s", "ko": "task_id 에는 정수 값이 필요합니다: %s", "es": "task_id requiere un valor entero: %s", "ja": "task_id には整数値が必要です: %s"},
+	"company_id 需要整数值: %s":  {"en": "company_id requires an integer value: %s", "ko": "company_id 에는 정수 값이 필요합니다: %s", "es": "company_id requiere un valor entero: %s", "ja": "company_id には整数値が必要です: %s"},
+	"字段 %s 需要整数值: %s":       {"en": "Field %s requires an integer value: %s", "ko": "필드 %s 에는 정수 값이 필요합니다: %s", "es": "El campo %s requiere un valor entero: %s", "ja": "フィールド %s には整数値が必要です: %s"},
+	"字段 %s 不支持运算符 %s":      {"en": "Field %s does not support operator %s", "ko": "필드 %s 는 연산자 %s 를 지원하지 않습니다", "es": "El campo %s no admite el operador %s", "ja": "フィールド %s は演算子 %s をサポートしていません"},
+	"数组字段 %s 不支持运算符 %s":    {"en": "Array field %s does not support operator %s", "ko": "배열 필드 %s 는 연산자 %s 를 지원하지 않습니다", "es": "El campo de arreglo %s no admite el operador %s", "ja": "配列フィールド %s は演算子 %s をサポートしていません"},
+	"字符串字段 %s 不支持运算符 %s":   {"en": "String field %s does not support operator %s", "ko": "문자열 필드 %s 는 연산자 %s 를 지원하지 않습니다", "es": "El campo de cadena %s no admite el operador %s", "ja": "文字列フィールド %s は演算子 %s をサポートしていません"},
+	"未知字段: %s":             {"en": "Unknown field: %s", "ko": "알 수 없는 필드: %s", "es": "Campo desconocido: %s", "ja": "不明なフィールド: %s"},
+	"当前会话已有旁路问题正在回答": {"en": "Another side question is already running for this session", "ko": "현재 세션에서 이미 곁질문 답변이 진행 중입니다", "es": "Ya hay otra pregunta paralela en curso en esta sesión", "ja": "このセッションではすでにサイドクエスチョンの回答が進行中です"},
+	"旁路父会话已删除或归档":   {"en": "The parent session has been deleted or archived", "ko": "곁질문의 상위 세션이 삭제되었거나 보관되었습니다", "es": "La sesión principal se eliminó o archivó", "ja": "親セッションは削除またはアーカイブされました"},
+	"同一请求 ID 不能用于不同问题": {"en": "The same request ID cannot be reused for a different question", "ko": "같은 요청 ID 를 서로 다른 질문에 사용할 수 없습니다", "es": "No se puede reutilizar el mismo ID de solicitud para otra pregunta", "ja": "同じリクエスト ID を別の質問に使用できません"},
+	"服务重启，回答已中断":     {"en": "The answer was interrupted because the service restarted", "ko": "서비스가 재시작되어 답변이 중단되었습니다", "es": "La respuesta se interrumpió porque se reinició el servicio", "ja": "サービスが再起動されたため回答が中断されました"},
 }
 
 // TrMsg translates a user-facing Chinese source message into the active output

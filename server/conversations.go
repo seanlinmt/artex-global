@@ -114,7 +114,9 @@ func (s *Server) pgListConversations(w http.ResponseWriter, r *http.Request) {
 	items := make([]conversationListItem, 0, len(cs))
 	s.chatMu.Lock()
 	for _, c := range cs {
-		items = append(items, conversationListItem{Conversation: c, Running: s.chatBusy[s.convBusyKey(c.ID)]})
+		cp := *c
+		cp.Title = translateConversationTitle(cp.Title)
+		items = append(items, conversationListItem{Conversation: &cp, Running: s.chatBusy[s.convBusyKey(c.ID)]})
 	}
 	s.chatMu.Unlock()
 	writeJSON(w, 200, map[string]any{"conversations": items})
@@ -139,7 +141,7 @@ func (s *Server) pgCreateConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if utf8.RuneCountInString(req.AgentKey) > maxConversationAgentKeyRunes {
-		writeErr(w, 400, fmt.Sprintf(convErrAgentKeyTooLong, maxConversationAgentKeyRunes))
+		writeErr(w, 400, fmt.Sprintf(trMsg(convErrAgentKeyTooLong), maxConversationAgentKeyRunes))
 		return
 	}
 	a, err := pg.GetAgentByKey(req.AgentKey)
@@ -162,7 +164,7 @@ func (s *Server) pgCreateConversation(w http.ResponseWriter, r *http.Request) {
 		title = convDefaultTitle
 	}
 	if utf8.RuneCountInString(title) > maxConversationTitleRunes {
-		writeErr(w, 400, fmt.Sprintf(convErrTitleTooLong, maxConversationTitleRunes))
+		writeErr(w, 400, fmt.Sprintf(trMsg(convErrTitleTooLong), maxConversationTitleRunes))
 		return
 	}
 	c, err := pg.CreateConversation(req.AgentKey, title, req.LLMProfileID)
@@ -170,7 +172,9 @@ func (s *Server) pgCreateConversation(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, c)
+	cp := *c
+	cp.Title = translateConversationTitle(cp.Title)
+	writeJSON(w, 200, &cp)
 }
 
 func (s *Server) pgUpdateConversation(w http.ResponseWriter, r *http.Request) {
@@ -243,7 +247,7 @@ func (s *Server) pgRenameConversation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if utf8.RuneCountInString(title) > maxConversationTitleRunes {
-			writeErr(w, 400, fmt.Sprintf(convErrTitleTooLong, maxConversationTitleRunes))
+			writeErr(w, 400, fmt.Sprintf(trMsg(convErrTitleTooLong), maxConversationTitleRunes))
 			return
 		}
 		req.Title = &title
@@ -257,7 +261,9 @@ func (s *Server) pgRenameConversation(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "conversation not found")
 		return
 	}
-	writeJSON(w, 200, updated)
+	cp := *updated
+	cp.Title = translateConversationTitle(cp.Title)
+	writeJSON(w, 200, &cp)
 }
 
 func (s *Server) pgDeleteConversation(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +326,7 @@ func (s *Server) pgDeleteConversationsBatch(w http.ResponseWriter, r *http.Reque
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 || len(ids) > maxConversationDeleteBatch {
-		writeErr(w, http.StatusBadRequest, fmt.Sprintf(convErrIDsCount, maxConversationDeleteBatch))
+		writeErr(w, http.StatusBadRequest, fmt.Sprintf(trMsg(convErrIDsCount), maxConversationDeleteBatch))
 		return
 	}
 	for _, id := range ids {
@@ -409,7 +415,7 @@ func (s *Server) pgConversationMsgDetail(w http.ResponseWriter, r *http.Request)
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]any{"detail": agent.DisplayDetail(detail)})
+	writeJSON(w, 200, map[string]any{"detail": translateLazyActivityDetail(detail)})
 }
 
 // pgStopConversation aborts the in-flight run for one conversation (manual stop —

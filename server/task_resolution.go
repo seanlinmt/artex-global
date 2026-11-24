@@ -31,7 +31,7 @@ const (
 
 func (s *Server) resolutionFromProfile(p *db.LLMProfile, source string) taskLLMResolution {
 	if p == nil {
-		return taskLLMResolution{Source: source, Reason: reasonLLMProfileMissing}
+		return taskLLMResolution{Source: source, Reason: trMsg(reasonLLMProfileMissing)}
 	}
 	id := p.ID
 	result := taskLLMResolution{
@@ -42,11 +42,11 @@ func (s *Server) resolutionFromProfile(p *db.LLMProfile, source string) taskLLMR
 		Source:    source,
 	}
 	if p.APIKey == "" {
-		result.Reason = reasonLLMProfileNoAPIKey
+		result.Reason = trMsg(reasonLLMProfileNoAPIKey)
 		return result
 	}
 	if _, _, ok := s.providerForProfile(p.ID); !ok {
-		result.Reason = reasonLLMProfileInvalid
+		result.Reason = trMsg(reasonLLMProfileInvalid)
 		return result
 	}
 	result.Available = true
@@ -79,7 +79,7 @@ func (s *Server) resolveTaskRoleLLM(t *Task, agentKey string) (taskLLMResolution
 	state := t.llmStateSnapshot()
 	if len(state.ProfileIDs) > 0 {
 		if state.ActiveID == nil {
-			return taskLLMResolution{Source: "task_chain", Reason: reasonTaskLLMChainExhausted}, nil
+			return taskLLMResolution{Source: "task_chain", Reason: trMsg(reasonTaskLLMChainExhausted)}, nil
 		}
 		p, err := s.m.pg.ProfileByID(*state.ActiveID)
 		if err != nil {
@@ -102,14 +102,14 @@ func (s *Server) resolveTaskRoleLLM(t *Task, agentKey string) (taskLLMResolution
 	s.cfgMu.Unlock()
 	if on {
 		if name == "" {
-			name = sourceNameGlobalConfig
+			name = trMsg(sourceNameGlobalConfig)
 		}
 		return taskLLMResolution{
 			Name: name, Format: cfg.Provider(), Model: cfg.Model,
 			Source: "environment", Available: true,
 		}, nil
 	}
-	return taskLLMResolution{Source: "global", Reason: reasonNoLLMAvailable}, nil
+	return taskLLMResolution{Source: "global", Reason: trMsg(reasonNoLLMAvailable)}, nil
 }
 
 func (s *Server) taskLLMResolutionHandler(w http.ResponseWriter, r *http.Request) {

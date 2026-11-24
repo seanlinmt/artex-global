@@ -398,6 +398,13 @@ func (s *Server) listAssets(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	for i, a := range assets {
+		if a.TaskSourceSummary != "" {
+			cp := *a
+			cp.TaskSourceSummary = translateActivitySummary(cp.TaskSourceSummary)
+			assets[i] = &cp
+		}
+	}
 	writeJSON(w, 200, map[string]any{
 		"count":  len(assets),
 		"total":  total,
