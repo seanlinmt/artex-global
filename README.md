@@ -121,6 +121,8 @@ Upstream provides several methods: an install script (`./install.sh`), precompil
 
 > Launch with `start.sh` (`start.bat` on Windows) rather than running `./artex` directly. That script is a supervisor that restarts the program based on its exit code, and it also handles the UI's "one-click update."
 
+- **macOS app bundle with Full Disk Access:** on macOS, `go run` builds a throwaway ad-hoc-signed binary in a temp path, and `dev.sh`'s bash hop makes TCC attribute file reads to a shell that macOS auto-denies. That blocks `~/Library/Mail`, `~/Library/Messages`, Safari data, browser profiles and the TCC databases themselves. To run ARTEX as a signed `/Applications/ARTEX.app` with a stable TCC identity, see **[docs/macos-install-en.md](docs/macos-install-en.md)** — it covers the one-time Full Disk Access grant and how to rebuild after a `git pull` without losing it.
+
 ---
 
 ## Configuration
